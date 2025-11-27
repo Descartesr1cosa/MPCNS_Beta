@@ -285,6 +285,8 @@ void Grid::Read_Phy_Boundary(std::string _my_id_s)
 
             bcl.this_block_num = izone;
 
+            bcl.this_block_name = iblock.block_name;
+
             iblock.physical_bc.push_back(bcl);
         }
     }
