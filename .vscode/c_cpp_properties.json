@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Program Files (x86)/Microsoft SDKs/MPI/Include",
+                "D:/SciComp/fftw/include",
+                "D:/msys64/mingw64/include/**",
+                "D:/msys64/home/Descartes/tmp_petsc/petsc/include/**",
+                "D:/msys64/home/Descartes/tmp_petsc/petsc/arch-mswin-c-debug/include"
+            ],
+            "defines": [],
+            "compilerPath": "D:/mingw64/bin/g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        }
+    ],
+    "version": 4
+}
