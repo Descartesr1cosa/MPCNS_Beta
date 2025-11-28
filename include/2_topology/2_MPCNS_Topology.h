@@ -19,7 +19,7 @@ namespace TOPO
     };
 
     // point_local -> point_nb 的索引变换：
-    // nb[ a ] = sign[a] * local[ perm[a] ] + offset[a]
+    // nb[ perm[a] ] = sign[a] * local[ a ] + offset[a]
     struct IndexTransform
     {
         int perm[3]; // {0,1,2} 的排列，表示本地哪个坐标对应到邻居的 i/j/k
