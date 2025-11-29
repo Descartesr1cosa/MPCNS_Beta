@@ -8,6 +8,7 @@
 #include "0_basic/MPI_WRAPPER.h"
 #include "2_topology/2_MPCNS_Topology.h"
 #include "3_field/2_MPCNS_Field.h"
+#include "3_field/3_MPCNS_Halo.h"
 //==============================================================================
 
 //==============================================================================
@@ -50,12 +51,25 @@ int main(int arg, char **argv)
         FieldDescriptor{"B_zeta", StaggerLocation::FaceZe, 1, par->GetInt("ngg")});
     fld->register_field(
         FieldDescriptor{"PV_", StaggerLocation::Cell, 4, par->GetInt("ngg")});
+    //--------------------------------------------------------------------------
+    // 建立Halo通信
+    Halo *hal = new Halo(fld, &topology);
+    //=============================================================================================
+
+    hal->exchange_inner("U_");
+    std::cout << "Finish inner communication of rank \t" << myid << "\n"
+              << std::flush;
+    PARALLEL::mpi_barrier();
+    hal->exchange_parallel("U_");
+    std::cout << "Finish para communication of rank \t" << myid << "\n"
+              << std::flush;
     //=============================================================================================
     //--------------------------------------------------------------------------
     // MPI终止
     PARALLEL::mpi_finalize();
     //--------------------------------------------------------------------------
     // 释放所分配的空间，建议按照创建顺序逆序释放
+    delete hal;
     delete fld;
     delete par;
     delete grd;
