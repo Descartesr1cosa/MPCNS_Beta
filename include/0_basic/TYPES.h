@@ -1,5 +1,5 @@
 // 0_basic/types.h
-
+#pragma once
 struct Int3
 {
     int i, j, k;
