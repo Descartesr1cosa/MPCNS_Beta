@@ -46,6 +46,8 @@ namespace TOPO
 
         // 从本块 (i,j,k) 到邻居块 (i',j',k') 的映射
         IndexTransform trans;
+
+        int32_t send_flag, recv_flag; // kind == PatchKind::Parallel才生效
     };
 
     // 物理边界 patch：只在本块/本 rank 的一侧

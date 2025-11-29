@@ -339,6 +339,10 @@ namespace TOPO
                 }
                 interface.trans.offset = {offset[0], offset[1], offset[2]};
                 //-------------------------------------------------------------
+                // 存入send/recv_flag
+                interface.send_flag = para.send_flag;
+                interface.recv_flag = para.rece_flag;
+                //
                 topo.parallel_patches.push_back(interface);
             }
         }
