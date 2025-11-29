@@ -29,6 +29,7 @@ public:
     // 分配所有 fieldid 下 block 的数据
     void allocate(int32_t fieldID);
 
+    int field_id(std::string field_name) { return name_to_id_[field_name]; }
     int num_fields() const { return static_cast<int>(field_descs_.size()); }
     int num_blocks() const { return static_cast<int>(blocks_.size()); }
 
