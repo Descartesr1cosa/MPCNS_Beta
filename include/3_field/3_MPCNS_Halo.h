@@ -13,6 +13,13 @@ public:
         build_pattern();
     };
 
+    void data_trans(std::string &field_name)
+    {
+        // 顺序上 inner/parallel 没强依赖，一般都可以：
+        exchange_inner(field_name);
+        exchange_parallel(field_name);
+    }
+
     // 对所有场做 inner halo
     void exchange_inner_all();
 
