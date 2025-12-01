@@ -277,7 +277,7 @@ void EulerSolver::Reconstruction(double *metric, int32_t direction, FieldBlock &
 
             i++;
         }
-        for (int index = 0; index < 11; index++)
+        for (int index = 0; index < 5; index++)
             RECON_minmod(recon[index], &(reconL[index]), &(reconR[index]));
         Withdraw(reconL, UL, ppvvL); //, BaddL);
         Withdraw(reconR, UR, ppvvR); //, BaddR);
@@ -332,7 +332,7 @@ void EulerSolver::Reconstruction(double *metric, int32_t direction, FieldBlock &
 
             k++;
         }
-        for (int index = 0; index < 11; index++)
+        for (int index = 0; index < 5; index++)
             RECON_minmod(recon[index], &(reconL[index]), &(reconR[index]));
         Withdraw(reconL, UL, ppvvL); //, BaddL);
         Withdraw(reconR, UR, ppvvR); //, BaddR);
