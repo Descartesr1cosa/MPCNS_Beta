@@ -14,7 +14,7 @@
 
 //=================================================================================================
 // 1_Euler_inviscid_Roe.cpp
-#define Reconstruction_Scheme 2
+#define Reconstruction_Scheme 1
 
 // 2_Euler_inviscid_Flux.cpp
 #define Flux_WENO_Scheme 11

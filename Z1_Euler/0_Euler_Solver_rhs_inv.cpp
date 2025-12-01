@@ -108,6 +108,7 @@ void EulerSolver::inv_rhs()
     }
 }
 
+#if Reconstruction_Scheme == 2
 void EulerSolver::Reconstruction(double *metric, int32_t direction, FieldBlock &PV, FieldBlock &U, int iblock, int index_i, int index_j, int index_k, double *out_flux)
 {
     auto RECON_minmod = [&](double *stencil, double *Left, double *Right)
@@ -350,3 +351,151 @@ void EulerSolver::Reconstruction(double *metric, int32_t direction, FieldBlock &
     for (int jj = 0; jj < 5; jj++)
         out_flux[jj] = 0.5 * (RightF[jj] + LeftF[jj]) - 0.5 * radius_max * (UR[jj] - UL[jj]);
 }
+
+#elif Reconstruction_Scheme == 1
+void EulerSolver::Reconstruction(double *metric, int32_t direction,
+                                 FieldBlock &PV, FieldBlock &U,
+                                 int iblock, int index_i, int index_j, int index_k,
+                                 double *out_flux)
+{
+    auto calc_Jac_radius_GCL = [&](double &out, double *uu, double *pv, double *metric)
+    {
+        double rho, p, u, v, w;
+        // double BB2, Bx, By, Bz;
+        double K1, K2, K3;
+        rho = uu[0];
+        u = pv[0];
+        v = pv[1];
+        w = pv[2];
+        p = pv[3];
+        // Bx = uu[5] + B[0];
+        // By = uu[6] + B[1];
+        // Bz = uu[7] + B[2];
+
+        // BB2 = Bx * Bx + By * By + Bz * Bz;
+
+        K1 = metric[0];
+        K2 = metric[1];
+        K3 = metric[2];
+
+        double uvw = K1 * u + K2 * v + K3 * w;
+        double cc = sqrt((gamma_ * p / rho) * (K1 * K1 + K2 * K2 + K3 * K3));
+        // double cc = sqrt((gamma_ * p / rho + BB2 / rho * inver_MA2) * (K1 * K1 + K2 * K2 + K3 * K3));
+        // constexpr double C_hall_safe = 1.5;
+        // double c_hall = C_hall_safe * ion_inertial_len * sqrt(BB2 / rho * inver_MA2 * (K1 * K1 + K2 * K2 + K3 * K3)); // ≈ Jac * v_A * d_i * |k|
+        // out = fabs(uvw) + cc + c_hall;
+        out = fabs(uvw) + cc;
+        return;
+    };
+
+    auto calc_Jac_Flux_GCL = [&](double *flux, double *uu, double *pv, double *metric)
+    {
+        double k1, k2, k3; // GCL 这里为Jac *k1, Jac *k2, Jac *k3
+        k1 = metric[0];
+        k2 = metric[1];
+        k3 = metric[2];
+
+        double rho, p, u, v, w, uvw, rhoe;
+        // double Bx, By, Bz, B_Jac_nabla, P_B;
+
+        rho = uu[0];
+        u = pv[0];
+        v = pv[1];
+        w = pv[2];
+        p = pv[3];
+
+        // Bx = B[0] + uu[5];
+        // By = B[1] + uu[6];
+        // Bz = B[2] + uu[7];
+        // B_Jac_nabla = Bx * k1 + By * k2 + Bz * k3;
+        uvw = k1 * u + k2 * v + k3 * w;
+
+        // P_B = 0.5 * (Bx * Bx + By * By + Bz * Bz);
+        rhoe = p / (gamma_ - 1.0) + 0.5 * rho * (u * u + v * v + w * w);
+
+        flux[0] = rho * uvw;
+        flux[1] = (rho * uvw * u + k1 * p); // Euler Flux - Maxwell Tensor (B\otimesB - B^2/2 I)\cdot J\nabla \xi\eta\zeta
+        flux[2] = (rho * uvw * v + k2 * p);
+        flux[3] = (rho * uvw * w + k3 * p);
+        flux[4] = uvw * (rhoe + p); // Euler Flux
+
+        // flux[0] = rho * uvw;
+        // flux[1] = (rho * uvw * u + k1 * (p + inver_MA2 * P_B) - inver_MA2 * B_Jac_nabla * Bx); // Euler Flux - Maxwell Tensor (B\otimesB - B^2/2 I)\cdot J\nabla \xi\eta\zeta
+        // flux[2] = (rho * uvw * v + k2 * (p + inver_MA2 * P_B) - inver_MA2 * B_Jac_nabla * By);
+        // flux[3] = (rho * uvw * w + k3 * (p + inver_MA2 * P_B) - inver_MA2 * B_Jac_nabla * Bz);
+        // flux[4] = uvw * (rhoe + p); // Euler Flux
+
+        // u += H[0];
+        // v += H[1];
+        // w += H[2];
+        // uvw = k1 * u + k2 * v + k3 * w; // With Hall Effect
+
+        // flux[4] += inver_MA2 * (2.0 * P_B * uvw - (Bx * u + By * v + Bz * w) * B_Jac_nabla); // S(Poynting Vector) \cdot J\nabla \xi\eta\zeta
+        // flux[5] = uvw * Bx - B_Jac_nabla * u;
+        // flux[6] = uvw * By - B_Jac_nabla * v;
+        // flux[7] = uvw * Bz - B_Jac_nabla * w;
+    };
+
+    int i = index_i;
+    int j = index_j;
+    int k = index_k;
+
+    double UL[5], UR[5], ppvvL[4], ppvvR[4];
+    double radius[2];
+
+    auto fill_state = [&](int ic, int jc, int kc, double *Ucons, double *pv)
+    {
+        double rho = U(ic, jc, kc, 0);
+        double u = PV(ic, jc, kc, 0);
+        double v = PV(ic, jc, kc, 1);
+        double w = PV(ic, jc, kc, 2);
+        double p = PV(ic, jc, kc, 3);
+
+        pv[0] = u;
+        pv[1] = v;
+        pv[2] = w;
+        pv[3] = p;
+
+        Ucons[0] = rho;
+        Ucons[1] = rho * u;
+        Ucons[2] = rho * v;
+        Ucons[3] = rho * w;
+        Ucons[4] = p / (gamma_ - 1.0) + 0.5 * rho * (u * u + v * v + w * w);
+    };
+
+    if (direction == 0)
+    {
+        int iL = index_i - 1;
+        int iR = index_i;
+        fill_state(iL, j, k, UL, ppvvL);
+        fill_state(iR, j, k, UR, ppvvR);
+    }
+    else if (direction == 1)
+    {
+        int jL = index_j - 1;
+        int jR = index_j;
+        fill_state(i, jL, k, UL, ppvvL);
+        fill_state(i, jR, k, UR, ppvvR);
+    }
+    else
+    { // direction == 2
+        int kL = index_k - 1;
+        int kR = index_k;
+        fill_state(i, j, kL, UL, ppvvL);
+        fill_state(i, j, kR, UR, ppvvR);
+    }
+
+    calc_Jac_radius_GCL(radius[0], UL, ppvvL, metric);
+    calc_Jac_radius_GCL(radius[1], UR, ppvvR, metric);
+
+    double radius_max = std::max(radius[0], radius[1]);
+
+    double FL[5], FR[5];
+    calc_Jac_Flux_GCL(FL, UL, ppvvL, metric);
+    calc_Jac_Flux_GCL(FR, UR, ppvvR, metric);
+
+    for (int m = 0; m < 5; ++m)
+        out_flux[m] = 0.5 * (FL[m] + FR[m]) - 0.5 * radius_max * (UR[m] - UL[m]);
+}
+
+#endif
