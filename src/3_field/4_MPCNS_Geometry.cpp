@@ -52,7 +52,7 @@ void Field::build_geometry()
                         ry = minus(ori_yp, ori);
                         rx_ = minus(ori_yp, ori_xyp);
                         ry_ = minus(ori_xp, ori_xyp);
-                        Area = minus(cross(rx, ry), cross(rx_, ry_));
+                        Area = plus(cross(rx, ry), cross(rx_, ry_));
                         data(i, j, k, 0) = 0.5 * Area[0];
                         data(i, j, k, 1) = 0.5 * Area[1];
                         data(i, j, k, 2) = 0.5 * Area[2];
@@ -85,7 +85,7 @@ void Field::build_geometry()
                         ry = minus(ori_yp, ori);
                         rx_ = minus(ori_yp, ori_xyp);
                         ry_ = minus(ori_xp, ori_xyp);
-                        Area = minus(cross(rx, ry), cross(rx_, ry_));
+                        Area = plus(cross(rx, ry), cross(rx_, ry_));
                         data(i, j, k, 0) = 0.5 * Area[0];
                         data(i, j, k, 1) = 0.5 * Area[1];
                         data(i, j, k, 2) = 0.5 * Area[2];
@@ -94,7 +94,7 @@ void Field::build_geometry()
     }
 
     {
-        // Calc_ JDze  = Jac\nabla\eta = Area
+        // Calc_ JDze  = Jac\nabla\zeta = Area
         auto &data_ = field("JDze");
         for (int ib = 0; ib < grd->nblock; ++ib)
         {
@@ -118,7 +118,7 @@ void Field::build_geometry()
                         ry = minus(ori_yp, ori);
                         rx_ = minus(ori_yp, ori_xyp);
                         ry_ = minus(ori_xp, ori_xyp);
-                        Area = minus(cross(rx, ry), cross(rx_, ry_));
+                        Area = plus(cross(rx, ry), cross(rx_, ry_));
                         data(i, j, k, 0) = 0.5 * Area[0];
                         data(i, j, k, 1) = 0.5 * Area[1];
                         data(i, j, k, 2) = 0.5 * Area[2];
@@ -127,69 +127,146 @@ void Field::build_geometry()
     }
 
     {
-        // Calc_ Jac = \SUM Area \cdot dr
-        auto &data_ = field("Jac");
+        // Calc_ Jac = 1 / 3* \SUM Area \cdot dr
+        auto &Jac_ = field("Jac");
+        auto &Axi_ = field("JDxi");
+        auto &Aeta_ = field("JDet");
+        auto &Azeta_ = field("JDze");
+
         for (int ib = 0; ib < grd->nblock; ++ib)
         {
-            auto &data = data_[ib];
-
-            auto &A_xi = field("JDxi")[ib];
-            auto &A_eta = field("JDet")[ib];
-            auto &A_zeta = field("JDze")[ib];
-
-            auto &dual_x = grd->grids(ib).dual_x;
-            auto &dual_y = grd->grids(ib).dual_y;
-            auto &dual_z = grd->grids(ib).dual_z;
+            auto &Jac = Jac_[ib];
+            auto &A_xi = Axi_[ib];
+            auto &A_et = Aeta_[ib];
+            auto &A_ze = Azeta_[ib];
 
             auto &x = grd->grids(ib).x;
             auto &y = grd->grids(ib).y;
             auto &z = grd->grids(ib).z;
 
-            Int3 inner_range_lo = data.inner_lo();
-            Int3 inner_range_hi = data.inner_hi();
-            std::array<double, 3> Area, center, face_point, dr;
-            double Jacobian = 0.0;
-            for (int i = inner_range_lo.i; i < inner_range_hi.i; i++)
-                for (int j = inner_range_lo.j; j < inner_range_hi.j; j++)
-                    for (int k = inner_range_lo.k; k < inner_range_hi.k; k++)
+            auto &cx = grd->grids(ib).dual_x; // cell center
+            auto &cy = grd->grids(ib).dual_y;
+            auto &cz = grd->grids(ib).dual_z;
+
+            Int3 lo = Jac.inner_lo();
+            Int3 hi = Jac.inner_hi();
+
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
                     {
-                        center = {dual_x(i + 1, j + 1, k + 1), dual_y(i + 1, j + 1, k + 1), dual_z(i + 1, j + 1, k + 1)};
-                        Jacobian = 0.0;
+                        std::array<double, 3> xc = {cx(i + 1, j + 1, k + 1),
+                                                    cy(i + 1, j + 1, k + 1),
+                                                    cz(i + 1, j + 1, k + 1)};
 
-                        // Minus
-                        face_point = {x(i, j, k), y(i, j, k), z(i, j, k)};
-                        dr = minus(center, face_point);
+                        double V = 0.0;
 
-                        // Face_Xi minus
-                        Area = {A_xi(i, j, k, 0), A_xi(i, j, k, 1), A_xi(i, j, k, 2)};
-                        Jacobian += dot(Area, dr);
+                        auto dot = [&](const std::array<double, 3> &a, const std::array<double, 3> &b)
+                        {
+                            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+                        };
+                        auto minus = [&](const std::array<double, 3> &a, const std::array<double, 3> &b)
+                        {
+                            return std::array<double, 3>{a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+                        };
 
-                        // Face_Eta minus
-                        Area = {A_eta(i, j, k, 0), A_eta(i, j, k, 1), A_eta(i, j, k, 2)};
-                        Jacobian += dot(Area, dr);
+                        // 下面要小心：对 minus 面，把 A 反号变成“对 cell 的外法向”
+                        // 并且 face center 要用对应那 4 个顶点的平均
 
-                        // Face_Xi minus
-                        Area = {A_zeta(i, j, k, 0), A_zeta(i, j, k, 1), A_zeta(i, j, k, 2)};
-                        Jacobian += dot(Area, dr);
+                        // --- xi- face at i ---
+                        std::array<double, 3> Af_xm = {-A_xi(i, j, k, 0),
+                                                       -A_xi(i, j, k, 1),
+                                                       -A_xi(i, j, k, 2)};
+                        std::array<double, 3> xf_xm = {
+                            0.25 * (x(i, j, k) + x(i, j + 1, k) + x(i, j, k + 1) + x(i, j + 1, k + 1)),
+                            0.25 * (y(i, j, k) + y(i, j + 1, k) + y(i, j, k + 1) + y(i, j + 1, k + 1)),
+                            0.25 * (z(i, j, k) + z(i, j + 1, k) + z(i, j, k + 1) + z(i, j + 1, k + 1))};
+                        V += dot(Af_xm, minus(xf_xm, xc));
 
-                        // Plus
-                        face_point = {x(i + 1, j + 1, k + 1), x(i + 1, j + 1, k + 1), x(i + 1, j + 1, k + 1)};
-                        dr = minus(center, face_point);
+                        // --- xi+ face at i+1 ---
+                        std::array<double, 3> Af_xp = {A_xi(i + 1, j, k, 0),
+                                                       A_xi(i + 1, j, k, 1),
+                                                       A_xi(i + 1, j, k, 2)};
+                        std::array<double, 3> xf_xp = {
+                            0.25 * (x(i + 1, j, k) + x(i + 1, j + 1, k) + x(i + 1, j, k + 1) + x(i + 1, j + 1, k + 1)),
+                            0.25 * (y(i + 1, j, k) + y(i + 1, j + 1, k) + y(i + 1, j, k + 1) + y(i + 1, j + 1, k + 1)),
+                            0.25 * (z(i + 1, j, k) + z(i + 1, j + 1, k) + z(i + 1, j, k + 1) + z(i + 1, j + 1, k + 1))};
+                        V += dot(Af_xp, minus(xf_xp, xc));
 
-                        // Face_Xi plus
-                        Area = {A_xi(i + 1, j, k, 0), A_xi(i + 1, j, k, 1), A_xi(i + 1, j, k, 2)};
-                        Jacobian += dot(Area, dr);
+                        // --- eta- face at j ---
+                        std::array<double, 3> Af_em = {-A_et(i, j, k, 0),
+                                                       -A_et(i, j, k, 1),
+                                                       -A_et(i, j, k, 2)};
+                        std::array<double, 3> xf_em = {
+                            0.25 * (x(i, j, k) + x(i + 1, j, k) + x(i, j, k + 1) + x(i + 1, j, k + 1)),
+                            0.25 * (y(i, j, k) + y(i + 1, j, k) + y(i, j, k + 1) + y(i + 1, j, k + 1)),
+                            0.25 * (z(i, j, k) + z(i + 1, j, k) + z(i, j, k + 1) + z(i + 1, j, k + 1))};
+                        V += dot(Af_em, minus(xf_em, xc));
 
-                        // Face_Eta plus
-                        Area = {A_eta(i, j + 1, k, 0), A_eta(i, j + 1, k, 1), A_eta(i, j + 1, k, 2)};
-                        Jacobian += dot(Area, dr);
+                        // --- eta+ face at j+1 ---
+                        std::array<double, 3> Af_ep = {A_et(i, j + 1, k, 0),
+                                                       A_et(i, j + 1, k, 1),
+                                                       A_et(i, j + 1, k, 2)};
+                        std::array<double, 3> xf_ep = {
+                            0.25 * (x(i, j + 1, k) + x(i + 1, j + 1, k) + x(i, j + 1, k + 1) + x(i + 1, j + 1, k + 1)),
+                            0.25 * (y(i, j + 1, k) + y(i + 1, j + 1, k) + y(i, j + 1, k + 1) + y(i + 1, j + 1, k + 1)),
+                            0.25 * (z(i, j + 1, k) + z(i + 1, j + 1, k) + z(i, j + 1, k + 1) + z(i + 1, j + 1, k + 1))};
+                        V += dot(Af_ep, minus(xf_ep, xc));
 
-                        // Face_Zeta plus
-                        Area = {A_zeta(i, j, k + 1, 0), A_zeta(i, j, k + 1, 1), A_zeta(i, j, k + 1, 2)};
-                        Jacobian += dot(Area, dr);
+                        // --- zeta- face at k ---
+                        std::array<double, 3> Af_zm = {-A_ze(i, j, k, 0),
+                                                       -A_ze(i, j, k, 1),
+                                                       -A_ze(i, j, k, 2)};
+                        std::array<double, 3> xf_zm = {
+                            0.25 * (x(i, j, k) + x(i + 1, j, k) + x(i, j + 1, k) + x(i + 1, j + 1, k)),
+                            0.25 * (y(i, j, k) + y(i + 1, j, k) + y(i, j + 1, k) + y(i + 1, j + 1, k)),
+                            0.25 * (z(i, j, k) + z(i + 1, j, k) + z(i, j + 1, k) + z(i + 1, j + 1, k))};
+                        V += dot(Af_zm, minus(xf_zm, xc));
 
-                        data(i, j, k, 0) = Jacobian / 3.0;
+                        // --- zeta+ face at k+1 ---
+                        std::array<double, 3> Af_zp = {A_ze(i, j, k + 1, 0),
+                                                       A_ze(i, j, k + 1, 1),
+                                                       A_ze(i, j, k + 1, 2)};
+                        std::array<double, 3> xf_zp = {
+                            0.25 * (x(i, j, k + 1) + x(i + 1, j, k + 1) + x(i, j + 1, k + 1) + x(i + 1, j + 1, k + 1)),
+                            0.25 * (y(i, j, k + 1) + y(i + 1, j, k + 1) + y(i, j + 1, k + 1) + y(i + 1, j + 1, k + 1)),
+                            0.25 * (z(i, j, k + 1) + z(i + 1, j, k + 1) + z(i, j + 1, k + 1) + z(i + 1, j + 1, k + 1))};
+                        V += dot(Af_zp, minus(xf_zp, xc));
+
+                        Jac(i, j, k, 0) = V / 3.0;
                     }
         }
     }
+
+    // GCL Test
+    // {
+    //     auto &Jac_ = field("Jac");
+    //     auto &Axi_ = field("JDxi");
+    //     auto &Aeta_ = field("JDet");
+    //     auto &Azeta_ = field("JDze");
+    //     for (int ib = 0; ib < grd->nblock; ++ib)
+    //     {
+    //         auto &Jac = Jac_[ib];
+    //         auto &A_xi = Axi_[ib];
+    //         auto &A_et = Aeta_[ib];
+    //         auto &A_ze = Azeta_[ib];
+    //         Int3 lo = Jac.inner_lo();
+    //         Int3 hi = Jac.inner_hi();
+    //         for (int i = lo.i; i < hi.i; ++i)
+    //             for (int j = lo.j; j < hi.j; ++j)
+    //                 for (int k = lo.k; k < hi.k; ++k)
+    //                 {
+    //                     double error0 = A_xi(i + 1, j, k, 0) - A_xi(i, j, k, 0);
+    //                     double error1 = A_xi(i + 1, j, k, 1) - A_xi(i, j, k, 1);
+    //                     double error2 = A_xi(i + 1, j, k, 2) - A_xi(i, j, k, 2);
+    //                     error0 += A_et(i, j + 1, k, 0) - A_et(i, j, k, 0);
+    //                     error1 += A_et(i, j + 1, k, 1) - A_et(i, j, k, 1);
+    //                     error2 += A_et(i, j + 1, k, 2) - A_et(i, j, k, 2);
+    //                     error0 += A_ze(i, j, k + 1, 0) - A_ze(i, j, k, 0);
+    //                     error1 += A_ze(i, j, k + 1, 1) - A_ze(i, j, k, 1);
+    //                     error2 += A_ze(i, j, k + 1, 2) - A_ze(i, j, k, 2);
+    //                     std::cout << sqrt(error0 * error0 + error1 * error1 + error2 * error2) << "\n";
+    //                 }
+    //     }
+    // }
 }

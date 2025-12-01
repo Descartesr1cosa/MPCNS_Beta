@@ -8,5 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # directories
 #==================================================================
-add_subdirectory(./Z0_NULL)
+# add_subdirectory(./Z0_NULL)
+add_subdirectory(./Z1_Euler)
 #==================================================================
