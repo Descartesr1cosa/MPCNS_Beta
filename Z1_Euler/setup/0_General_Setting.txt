@@ -1,0 +1,32 @@
+bool		parallel_setting		1
+int			dimension			3
+double 		scale				1
+int			ngg					4
+bool		continue_calc				0
+bool		continue_calc_index		0	//是否重新以当下步作为残差的参考值，续算时有效
+int			Read_Method		2	//0表示ASCII格式的plot3D 1表示二进制网格
+
+int			max_Nstep			50000//5000000 //20000//5000000 //3651//500000//100000000  // 1000
+double		tolerance				-1e-8
+
+
+double 		max_Time			20.0
+double		CFL				0.8
+double		Time_step			-2.5e-4
+
+int			output_step			5000
+int			output_residual		500
+
+double		yee					0.125
+int			corner_treat			2
+
+LIST==================================================================
+constant		5
+(double)
+gamma		NA          R_uni		    mu_mag              q_e
+1.6667		6.02E23     8.314            1.256637061e-6      1.602E-19
+LIST==================================================================
+# gamma  mixture, without electrons (g_e*p_e + g_i*p_i)/(p_e + p_i) ?
+
+END_OF_FILE
+

@@ -1,0 +1,4 @@
+double 		B_ref 				1E-9
+double 		L_ref 				1.738E6
+
+END_OF_FILE

@@ -1,0 +1,17 @@
+int	initialization_method		0
+//	0	最简单的初始化方法
+//	1	phi_Test	按照特定函数关系初始化速度场、磁场
+
+LIST==================================================================
+INITIAL		9
+(double)
+U			T		   	n       Molecular_mass  	    c_y 	c_z	    Bx  		By  		Bz
+4.61E5		2.5E5		7E6     0.001                  0.0		0.0       0.0		7E-9		0.0		 LIST==================================================================
+#4.61E5		2.5E5		7E6     0.001                  0.0		0.0       0.0		7E-9  	0.0
+#5.0E5		2.5E5		2.6E6     0.001                  0.0		0.0       5.57E-9		5.02E-9 	0.0
+# -7E10		6.965E-9 5.57E-9		5.02E-9 	0.0
+#n              /m3   , without electrons
+#Molecular_mass kg/mol, mixture, without electrons
+#B_ref          T
+
+END_OF_FILE
