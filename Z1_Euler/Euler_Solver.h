@@ -107,43 +107,6 @@ private:
 
     void inv_rhs();
 
-    struct Double3
-    {
-        double vector[3];
-        Double3 &operator+(Double3 add)
-        {
-            vector[0] += add.vector[0];
-            vector[1] += add.vector[1];
-            vector[2] += add.vector[2];
-            return *this;
-        }
-        Double3 &operator-(Double3 add)
-        {
-            vector[0] -= add.vector[0];
-            vector[1] -= add.vector[1];
-            vector[2] -= add.vector[2];
-            return *this;
-        }
-        Double3 &operator*(double add)
-        {
-            vector[0] *= add;
-            vector[1] *= add;
-            vector[2] *= add;
-            return *this;
-        }
-        double operator*(Double3 add)
-        {
-            return vector[0] * add.vector[0] + vector[1] * add.vector[1] + vector[2] * add.vector[2];
-        }
-        Double3 &operator()(double a, double b, double c)
-        {
-            vector[0] = a;
-            vector[1] = b;
-            vector[2] = c;
-            return *this;
-        }
-    };
-
     void Reconstruction(double *metric, int32_t direction, FieldBlock &PV, FieldBlock &U, int iblock, int index_i, int index_j, int index_k, double *out_flux);
 
     void calc_PV()
