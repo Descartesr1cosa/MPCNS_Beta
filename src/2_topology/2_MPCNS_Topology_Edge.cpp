@@ -303,6 +303,12 @@ namespace TOPO
                     // 方向：这条棱是由两个面 f1,f2 交出来的
                     ep.dir1 = f1.dir_code;
                     ep.dir2 = f2.dir_code;
+                    if (ep.dir1 != owner->dir_code)
+                    {
+                        // 需要保证，法向一定为dir1方向，便于发送者处理发送范围
+                        ep.dir2 = ep.dir1;
+                        ep.dir1 = owner->dir_code;
+                    }
 
                     //==============================
                     // 2.3 按 kind 分类存到不同的 vector
@@ -556,10 +562,29 @@ namespace TOPO
                         try_add_dir(ep->dir2);
                     }
 
-                    // 填到 VertexPatch 里：按轴排序存储，方便以后判断
+                    // 填到 VertexPatch
                     vp.dir1 = dir_by_axis[1]; // X±
                     vp.dir2 = dir_by_axis[2]; // Y±
                     vp.dir3 = dir_by_axis[3]; // Z±
+                    if (vp.dir1 != owner->dir1)
+                    {
+                        // 需要保证，法向一定为dir1方向，便于发送者处理发送范围
+                        if (vp.dir2 == owner->dir1)
+                        {
+                            vp.dir2 = vp.dir1;
+                            vp.dir1 = owner->dir1;
+                        }
+                        else if (vp.dir3 == owner->dir1)
+                        {
+                            vp.dir3 = vp.dir1;
+                            vp.dir1 = owner->dir1;
+                        }
+                        else
+                        {
+                            std::cout << "Error, direction error for 3D Cornner\n";
+                            exit(-1);
+                        }
+                    }
 
                     //==============================
                     // 2.5 按 kind 分类存储

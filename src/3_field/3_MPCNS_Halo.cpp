@@ -4,8 +4,20 @@ void Halo::build_pattern()
 {
     for (int fid = 0; fid < fld_->num_fields(); fid++)
     {
-        build_inner_pattern(fld_->descriptor(fid).location, fld_->descriptor(fid).nghost);
-        build_parallel_pattern(fld_->descriptor(fid).location, fld_->descriptor(fid).nghost);
+        auto loc = fld_->descriptor(fid).location;
+        auto nghost = fld_->descriptor(fid).nghost;
+
+        // 1. face 级
+        build_inner_pattern(loc, nghost);
+        build_parallel_pattern(loc, nghost);
+
+        // 2. edge 级
+        build_inner_edge_pattern(loc, nghost);
+        build_parallel_edge_pattern(loc, nghost);
+
+        // 3. vertex 级
+        build_inner_vertex_pattern(loc, nghost);
+        build_parallel_vertex_pattern(loc, nghost);
     }
 }
 

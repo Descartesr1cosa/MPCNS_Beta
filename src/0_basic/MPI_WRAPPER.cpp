@@ -62,4 +62,9 @@ namespace PARALLEL
     {
         MPI_Allreduce(number, sum, num, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     }
+
+    void mpi_alltoall(int *send, int send_num, int *recv, int recv_num)
+    {
+        MPI_Alltoall(send, send_num, MPI_INT, recv, recv_num, MPI_INT, MPI_COMM_WORLD);
+    }
 }

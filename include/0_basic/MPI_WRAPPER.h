@@ -21,4 +21,6 @@ namespace PARALLEL
 
     void mpi_data_send(int tar_id, int send_flag, double *data, int length, MPI_Request *status);
     void mpi_data_recv(int tar_id, int recv_flag, double *data, int length, MPI_Request *status);
+
+    void mpi_alltoall(int *send, int send_num, int *recv, int recv_num);
 }

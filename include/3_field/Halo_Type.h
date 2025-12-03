@@ -42,3 +42,47 @@ enum class Direction
     ZMinus,
     ZPlus
 };
+
+struct EdgeMeta
+{
+    using PatternKey = std::pair<StaggerLocation, int>;
+    PatternKey key; // {location, nghost}，方便多种 pattern 共用
+    int recv_rank;  // 拿 ghost 的那边
+    int send_rank;  // 提供 inner 的那边
+
+    int recv_block; // 在 recv_rank 上的 block id (this_block on recv side)
+    int send_block; // 在 send_rank 上的 block id (nb_block on recv side)
+
+    Box3 edge_node_on_send; // 这条 edge 在 send_block 的 node 范围 (ep.nb_box_node)
+
+    int dir1_send; // 在 send_block 上 edge 的两个方向（±1/±2/±3）
+    int dir2_send;
+
+    // 可选：如果你在 send_pattern 也需要 trans，可以携带 recv->send 的 IndexTransform
+    TOPO::IndexTransform trans_recv_to_send;
+
+    int tag; // 这一条 edge 通信的唯一标识，在 recv_rank 本地编号后写进去
+};
+
+struct VertexMeta
+{
+    using PatternKey = std::pair<StaggerLocation, int>;
+    PatternKey key; // {location, nghost}，方便多种 pattern 共用
+    int recv_rank;  // 拿 ghost 的那边
+    int send_rank;  // 提供 inner 的那边
+
+    int recv_block; // 在 recv_rank 上的 block id (this_block on recv side)
+    int send_block; // 在 send_rank 上的 block id (nb_block on recv side)
+
+    Box3 edge_node_on_send; // 这条 edge 在 send_block 的 node 范围 (ep.nb_box_node)
+
+    int dir1_send; // 在 send_block 上 edge 的两个方向（±1/±2/±3）
+    int dir2_send;
+
+    int dir3_send;
+
+    // 可选：如果你在 send_pattern 也需要 trans，可以携带 recv->send 的 IndexTransform
+    TOPO::IndexTransform trans_recv_to_send;
+
+    int tag; // 这一条 edge 通信的唯一标识，在 recv_rank 本地编号后写进去
+};
