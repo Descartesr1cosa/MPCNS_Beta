@@ -15,7 +15,8 @@ namespace TOPO
     enum class PatchKind
     {
         Inner,
-        Parallel
+        Parallel,
+        Physical
     };
 
     // point_local -> point_nb 的索引变换：
@@ -66,16 +67,89 @@ namespace TOPO
         const Physical_Boundary *raw = nullptr; // 回指原始结构（可选）
     };
 
+    // 二维角区（edge strip）：至少两个坐标在 inner 外
+    // 说明：这里不用 Direction，而是用 int dir1/dir2，约定：
+    //   ±1 -> X±, ±2 -> Y±, ±3 -> Z±
+    // 与 PhysicalPatch::direction 的约定保持一致，避免头文件循环依赖。
+    struct EdgePatch
+    {
+        PatchKind kind; // Inner / Parallel / Physical
+
+        int this_rank;
+        int nb_rank;
+
+        int this_block;
+        int nb_block;
+        std::string this_block_name;
+        std::string nb_block_name;
+
+        // 角区在 node 空间里的交集区域（沿着一条棱的 node strip）[lo, hi)
+        Box3 this_box_node;
+        Box3 nb_box_node;
+
+        IndexTransform trans; // this -> nb
+
+        // 该 edge 贴着两个出界方向，例如 XMinus(-1) + YPlus(+2)
+        int dir1; // ±1, ±2, ±3
+        int dir2; // ±1, ±2, ±3
+
+        // 只有 Parallel 时才真正使用，用于 MPI 通信
+        int32_t send_flag = 0;
+        int32_t recv_flag = 0;
+    };
+
+    // 三维角区（vertex 区）：三个坐标都在 inner 外
+    struct VertexPatch
+    {
+        PatchKind kind; // Inner / Parallel / Physical
+
+        int this_rank;
+        int nb_rank;
+
+        int this_block;
+        int nb_block;
+        std::string this_block_name;
+        std::string nb_block_name;
+
+        // 顶点附近的 node 区域（通常是一小块 [i,i+1)×[j,j+1)×[k,k+1)）
+        Box3 this_box_node;
+        Box3 nb_box_node;
+
+        IndexTransform trans;
+
+        // 三个出界方向，例如 XPlus(+1), YPlus(+2), ZMinus(-3)
+        int dir1; // ±1, ±2, ±3
+        int dir2; // ±1, ±2, ±3
+        int dir3; // ±1, ±2, ±3
+
+        int32_t send_flag = 0;
+        int32_t recv_flag = 0;
+    };
+
     // 汇总：以后 3_field 只拿 Topology 这一个对象
     struct Topology
     {
         std::vector<InterfacePatch> inner_patches;
         std::vector<InterfacePatch> parallel_patches;
         std::vector<PhysicalPatch> physical_patches;
+
+        // 二维角区（edge strip）
+        std::vector<EdgePatch> inner_edge_patches;
+        std::vector<EdgePatch> parallel_edge_patches;
+        std::vector<EdgePatch> physical_edge_patches;
+
+        // 三维角区（vertex 区）
+        std::vector<VertexPatch> inner_vertex_patches;
+        std::vector<VertexPatch> parallel_vertex_patches;
+        std::vector<VertexPatch> physical_vertex_patches;
     };
 
     // 从 Grid 构造 topology（每个 rank 本地调用一次）
     Topology build_topology(Grid &grid, int my_rank, int dimension);
 
     void node_box_from_subsup(const int sub[3], const int sup[3], Box3 &box);
+
+    // 从现有 inner/parallel/physical patch 自动生成 edge / vertex patch
+    void build_edge_patches(Grid &grid, Topology &topo, int dimension);
+    void build_vertex_patches(Grid &grid, Topology &topo, int dimension);
 } // namespace TOPO
