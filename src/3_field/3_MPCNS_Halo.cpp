@@ -10,15 +10,18 @@ void Halo::build_pattern()
         // 1. face 级
         build_inner_pattern(loc, nghost);
         build_parallel_pattern(loc, nghost);
-
-        // 2. edge 级
-        build_inner_edge_pattern(loc, nghost);
-        build_parallel_edge_pattern(loc, nghost);
-
-        // 3. vertex 级
-        build_inner_vertex_pattern(loc, nghost);
-        build_parallel_vertex_pattern(loc, nghost);
     }
+
+    int U_fid = fld_->field_id("U_");
+    auto loc = fld_->descriptor(U_fid).location;
+    auto nghost = fld_->descriptor(U_fid).nghost;
+    // 2. edge 级
+    build_inner_edge_pattern(loc, nghost);
+    build_parallel_edge_pattern(loc, nghost);
+
+    // 3. vertex 级
+    build_inner_vertex_pattern(loc, nghost);
+    build_parallel_vertex_pattern(loc, nghost);
 }
 
 void Halo::build_inner_pattern(StaggerLocation loc, int nghost)

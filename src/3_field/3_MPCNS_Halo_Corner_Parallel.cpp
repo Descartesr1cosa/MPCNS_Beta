@@ -97,95 +97,6 @@ void Halo::build_parallel_edge_pattern(StaggerLocation loc, int nghost)
     // 每个 neighbor_rank 自增 tag
     std::map<int, int> next_tag;
 
-    auto block_node_size = [](const Block &blk) -> Int3
-    {
-        return {blk.mx, blk.my, blk.mz};
-    };
-
-    // 和 inner_edge 的 detect_direction 一样
-    auto detect_direction = [&](Box3 &face, Int3 &blk_mxyz, int &dir1, int &dir2)
-    {
-        dir1 = -999;
-        dir2 = -999;
-        // 下面的判断逻辑基于假设：
-        // 接口在某一方向上厚度为 1 层节点，而且刚好贴在 0 或 Ni_node 上。
-
-        // XMinus: i=0 这一层节点
-        if (face.lo.i == 0 && face.hi.i == 1)
-        {
-            int direction = -1;
-            if (dir1 == -999)
-                dir1 = direction;
-            else if (dir2 == -999)
-                dir2 = direction;
-            else
-                return;
-        }
-
-        // XPlus: i=Ni_node 这一层节点
-        if (face.lo.i == blk_mxyz.i && face.hi.i == blk_mxyz.i + 1)
-        {
-            int direction = 1;
-            if (dir1 == -999)
-                dir1 = direction;
-            else if (dir2 == -999)
-                dir2 = direction;
-            else
-                return;
-        }
-
-        // YMinus: j=0
-        if (face.lo.j == 0 && face.hi.j == 1)
-        {
-            int direction = -2;
-            if (dir1 == -999)
-                dir1 = direction;
-            else if (dir2 == -999)
-                dir2 = direction;
-            else
-                return;
-        }
-
-        // YPlus: j=Nj_node
-        if (face.lo.j == blk_mxyz.j && face.hi.j == blk_mxyz.j + 1)
-        {
-            int direction = 2;
-            if (dir1 == -999)
-                dir1 = direction;
-            else if (dir2 == -999)
-                dir2 = direction;
-            else
-                return;
-        }
-
-        // ZMinus: k=0
-        if (face.lo.k == 0 && face.hi.k == 1)
-        {
-            int direction = -3;
-            if (dir1 == -999)
-                dir1 = direction;
-            else if (dir2 == -999)
-                dir2 = direction;
-            else
-                return;
-        }
-
-        // ZPlus: k=Nk_node
-        if (face.lo.k == blk_mxyz.k && face.hi.k == blk_mxyz.k + 1)
-        {
-            int direction = 3;
-            if (dir1 == -999)
-                dir1 = direction;
-            else if (dir2 == -999)
-                dir2 = direction;
-            else
-                return;
-        }
-
-        // 如果都不是，先简单报错，便于调试
-        throw std::runtime_error("detect_direction: cannot determine direction from node_box");
-    };
-
     auto int_to_direction = [&](int direction)
     {
         switch (direction)
@@ -531,7 +442,7 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
                 std::swap(tar_dir1_i, tar_dir3_i);
             else
             {
-                std::cout << "Error for parallel Edge Processing, mapping broken!\n";
+                std::cout << "Error for parallel Vertex Processing, mapping broken!\n";
                 std::exit(-1);
             }
         }
@@ -578,7 +489,7 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
         meta.send_rank = vp.nb_rank;
         meta.recv_block = vp.this_block;
         meta.send_block = vp.nb_block;
-        meta.edge_node_on_send = vp.nb_box_node;
+        meta.vertex_node_on_send = vp.nb_box_node;
         meta.dir1_send = tar_dir1_i;
         meta.dir2_send = tar_dir2_i;
         meta.dir3_send = tar_dir3_i;
@@ -588,7 +499,7 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
         meta_to_send[vp.nb_rank].push_back(meta);
     }
 
-    parallel_edge_patterns_recv[key] = std::move(pat_recv);
+    parallel_vertex_patterns_recv[key] = std::move(pat_recv);
 
     //=========================
     // 4. MPI 交换 EdgeMeta
@@ -660,7 +571,7 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
 
         // send_box：发送侧 inner strip + ghost strip（按约定，dir1 为 inner）
         r.send_box = make_cell_vertex_innerghost_box(
-            const_cast<Box3 &>(m.edge_node_on_send), send_d1, send_d2, send_d3, nghost);
+            const_cast<Box3 &>(m.vertex_node_on_send), send_d1, send_d2, send_d3, nghost);
 
         // 发送侧通常不需要用 recv_box，这里可以空着
         r.recv_box = Box3{};
@@ -672,5 +583,5 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
         pat_send.regions.push_back(r);
     }
 
-    parallel_edge_patterns_send[key] = std::move(pat_send);
+    parallel_vertex_patterns_send[key] = std::move(pat_send);
 }

@@ -74,7 +74,7 @@ struct VertexMeta
     int recv_block; // 在 recv_rank 上的 block id (this_block on recv side)
     int send_block; // 在 send_rank 上的 block id (nb_block on recv side)
 
-    Box3 edge_node_on_send; // 这条 edge 在 send_block 的 node 范围 (ep.nb_box_node)
+    Box3 vertex_node_on_send; // 这vertex在 send_block 的 node 范围 (ep.nb_box_node)
 
     int dir1_send; // 在 send_block 上 edge 的两个方向（±1/±2/±3）
     int dir2_send;
