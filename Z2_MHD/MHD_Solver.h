@@ -47,6 +47,7 @@ public:
         bound_.SetUp(grd_, fld_, topo_, par_);
 
         fld_->register_field(FieldDescriptor{"old_U_", StaggerLocation::Cell, 5, par->GetInt("ngg")});
+        fld_->register_field(FieldDescriptor{"divB", StaggerLocation::Cell, 1, par->GetInt("ngg")});
         fld_->register_field(FieldDescriptor{"old_B_xi", StaggerLocation::FaceXi, 1, par->GetInt("ngg")});
         fld_->register_field(FieldDescriptor{"old_B_eta", StaggerLocation::FaceEt, 1, par->GetInt("ngg")});
         fld_->register_field(FieldDescriptor{"old_B_zeta", StaggerLocation::FaceZe, 1, par->GetInt("ngg")});
@@ -72,10 +73,7 @@ public:
             halo_->data_trans_3DCorner(U_string);
 
             // 计算更新B_cell
-            calc_Bcell_inner();
-            halo_->data_trans(Bcell_string);
-            halo_->data_trans_2DCorner(Bcell_string);
-            halo_->data_trans_3DCorner(Bcell_string);
+            calc_Bcell();
 
             // 计算原始变量
             calc_PV();
@@ -107,14 +105,11 @@ public:
                 halo_->data_trans_3DCorner(U_string);
 
                 // 计算更新B_cell
-                calc_Bcell_inner();
-                halo_->data_trans(Bcell_string);
-                halo_->data_trans_2DCorner(Bcell_string);
-                halo_->data_trans_3DCorner(Bcell_string);
+                calc_Bcell();
 
                 // 计算原始变量
                 calc_PV();
-
+                calc_divB();
                 copy_field();
             }
 
@@ -250,7 +245,7 @@ private:
         }
     }
 
-    void calc_Bcell_inner()
+    void calc_Bcell()
     {
         const int nblock = fld_->num_blocks();
 
@@ -329,9 +324,38 @@ private:
                         Bcell(i, j, k, 2) = Bz_tot;
                     }
         }
-        halo_->exchange_inner("B_cell");
-        halo_->exchange_parallel("B_cell");
-        bound_.cell_copy_boundary("B_cell");
+        std::string Bcell_string = "B_cell";
+        halo_->data_trans(Bcell_string);
+        bound_.cell_copy_boundary(Bcell_string);
+        halo_->data_trans_2DCorner(Bcell_string);
+        halo_->data_trans_3DCorner(Bcell_string);
+    }
+
+    void calc_divB()
+    {
+        const int nblock = fld_->num_blocks();
+
+        for (int ib = 0; ib < nblock; ++ib)
+        {
+            auto &divB = fld_->field("divB", ib);
+            auto &Bxi = fld_->field("B_xi", ib);
+            auto &Beta = fld_->field("B_eta", ib);
+            auto &Bzeta = fld_->field("B_zeta", ib);
+            auto &Jac = fld_->field("Jac", ib);
+
+            Int3 lo = divB.inner_lo();
+            Int3 hi = divB.inner_hi();
+
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        divB(i, j, k, 0) = (Bxi(i + 1, j, k, 0) - Bxi(i, j, k, 0) +
+                                            Beta(i, j + 1, k, 0) - Beta(i, j, k, 0) +
+                                            Bzeta(i, j, k + 1, 0) - Bzeta(i, j, k, 0)) /
+                                           Jac(i, j, k, 0);
+                    }
+        }
     }
 
     void copy_field()
