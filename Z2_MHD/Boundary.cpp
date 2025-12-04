@@ -21,6 +21,8 @@ void MHD_Boundary::apply_cell_patch_U(const TOPO::PhysicalPatch &patch, int32_t 
     {
         apply_cell_farfield(U, patch);
     }
+    else if (patch.bc_name == "Pole")
+        apply_cell_pole(U, patch);
     else
     {
         // 默认给一个简单的拷贝边界
@@ -150,6 +152,8 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
                 Bz = Bcell(i, j, k, 2);
                 Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
                 p0 = (U(i, j, k, 4) - 0.5 * rho0 * (u0 * u0 + v0 * v0 + w0 * w0) - Eb) * (gamma_ - 1.0);
+
+                p0 = fmax(p0, 0.001);
 
                 U(i, j, k, 1) = rho0 * vec_v[0];
                 U(i, j, k, 2) = rho0 * vec_v[1];
