@@ -25,9 +25,10 @@ void Halo::build_inner_vertex_pattern(StaggerLocation loc, int nghost)
             else if (dir2 == -999)
                 dir2 = direction;
             else if (dir3 == -999)
+            {
                 dir3 = direction;
-            else
                 return;
+            }
         }
 
         // XPlus: i=Ni_node 这一层节点
@@ -39,9 +40,10 @@ void Halo::build_inner_vertex_pattern(StaggerLocation loc, int nghost)
             else if (dir2 == -999)
                 dir2 = direction;
             else if (dir3 == -999)
+            {
                 dir3 = direction;
-            else
                 return;
+            }
         }
 
         // YMinus: j=0
@@ -53,9 +55,10 @@ void Halo::build_inner_vertex_pattern(StaggerLocation loc, int nghost)
             else if (dir2 == -999)
                 dir2 = direction;
             else if (dir3 == -999)
+            {
                 dir3 = direction;
-            else
                 return;
+            }
         }
 
         // YPlus: j=Nj_node
@@ -67,9 +70,10 @@ void Halo::build_inner_vertex_pattern(StaggerLocation loc, int nghost)
             else if (dir2 == -999)
                 dir2 = direction;
             else if (dir3 == -999)
+            {
                 dir3 = direction;
-            else
                 return;
+            }
         }
 
         // ZMinus: k=0
@@ -81,9 +85,10 @@ void Halo::build_inner_vertex_pattern(StaggerLocation loc, int nghost)
             else if (dir2 == -999)
                 dir2 = direction;
             else if (dir3 == -999)
+            {
                 dir3 = direction;
-            else
                 return;
+            }
         }
 
         // ZPlus: k=Nk_node
@@ -95,13 +100,19 @@ void Halo::build_inner_vertex_pattern(StaggerLocation loc, int nghost)
             else if (dir2 == -999)
                 dir2 = direction;
             else if (dir3 == -999)
+            {
                 dir3 = direction;
-            else
                 return;
+            }
         }
 
+        std::cout << "block:" << blk_mxyz.i << " " << blk_mxyz.j << " " << blk_mxyz.k << "\n"
+                  << face.lo.i << "\t" << face.hi.i << " || "
+                  << face.lo.j << "\t" << face.hi.j << " || "
+                  << face.lo.k << "\t" << face.hi.k << "\n"
+                  << std::flush;
         // 如果都不是，先简单报错，便于调试
-        throw std::runtime_error("detect_direction: cannot determine direction from node_box");
+        throw std::runtime_error("detect_direction: cannot determine direction from node_box in build_inner_vertex_pattern");
     };
 
     auto int_to_direction = [&](int direction)
@@ -223,9 +234,10 @@ void Halo::build_inner_edge_pattern(StaggerLocation loc, int nghost)
             if (dir1 == -999)
                 dir1 = direction;
             else if (dir2 == -999)
+            {
                 dir2 = direction;
-            else
                 return;
+            }
         }
 
         // XPlus: i=Ni_node 这一层节点
@@ -235,9 +247,10 @@ void Halo::build_inner_edge_pattern(StaggerLocation loc, int nghost)
             if (dir1 == -999)
                 dir1 = direction;
             else if (dir2 == -999)
+            {
                 dir2 = direction;
-            else
                 return;
+            }
         }
 
         // YMinus: j=0
@@ -247,9 +260,10 @@ void Halo::build_inner_edge_pattern(StaggerLocation loc, int nghost)
             if (dir1 == -999)
                 dir1 = direction;
             else if (dir2 == -999)
+            {
                 dir2 = direction;
-            else
                 return;
+            }
         }
 
         // YPlus: j=Nj_node
@@ -259,9 +273,10 @@ void Halo::build_inner_edge_pattern(StaggerLocation loc, int nghost)
             if (dir1 == -999)
                 dir1 = direction;
             else if (dir2 == -999)
+            {
                 dir2 = direction;
-            else
                 return;
+            }
         }
 
         // ZMinus: k=0
@@ -271,9 +286,10 @@ void Halo::build_inner_edge_pattern(StaggerLocation loc, int nghost)
             if (dir1 == -999)
                 dir1 = direction;
             else if (dir2 == -999)
+            {
                 dir2 = direction;
-            else
                 return;
+            }
         }
 
         // ZPlus: k=Nk_node
@@ -283,13 +299,19 @@ void Halo::build_inner_edge_pattern(StaggerLocation loc, int nghost)
             if (dir1 == -999)
                 dir1 = direction;
             else if (dir2 == -999)
+            {
                 dir2 = direction;
-            else
                 return;
+            }
         }
 
+        std::cout << "block:" << blk_mxyz.i << " " << blk_mxyz.j << " " << blk_mxyz.k << "\n"
+                  << face.lo.i << "\t" << face.hi.i << " || "
+                  << face.lo.j << "\t" << face.hi.j << " || "
+                  << face.lo.k << "\t" << face.hi.k << "\n"
+                  << std::flush;
         // 如果都不是，先简单报错，便于调试
-        throw std::runtime_error("detect_direction: cannot determine direction from node_box");
+        throw std::runtime_error("detect_direction: cannot determine direction from node_box in build_inner_edge_pattern");
     };
 
     auto int_to_direction = [&](int direction)
