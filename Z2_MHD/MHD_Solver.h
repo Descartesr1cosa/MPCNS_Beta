@@ -325,8 +325,8 @@ private:
                     }
         }
         std::string Bcell_string = "B_cell";
-        halo_->data_trans(Bcell_string);
         bound_.cell_copy_boundary(Bcell_string);
+        halo_->data_trans(Bcell_string);
         halo_->data_trans_2DCorner(Bcell_string);
         halo_->data_trans_3DCorner(Bcell_string);
     }
