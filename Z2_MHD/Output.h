@@ -24,7 +24,7 @@ public:
         fld = _fld;
         get_filename(par);
         get_iffile(fld);
-        var_defaut_plt_name = {"rho", "u", "v", "w", "p", "Bx", "By", "Bz"};
+        var_defaut_plt_name = {"rho", "u", "v", "w", "p", "Bx", "By", "Bz", "divB"};
         var_defaut_bin_name = {"U_", "B_xi", "B_eta", "B_zeta"};
     }
 

@@ -227,6 +227,7 @@ void MHD_Output::output_plt_field(const std::vector<std::string> &var_list)
     //============================== 4. 找到需要的 Field ==============================
     const int fid_U = fld->field_id("U_");
     const int fid_PV = fld->field_id("PV_");
+    const int fid_divB = fld->field_id("divB");
 
     const FieldDescriptor &descU = fld->descriptor(fid_U);
     if (descU.location != StaggerLocation::Cell || descU.ncomp < 5)
@@ -270,6 +271,7 @@ void MHD_Output::output_plt_field(const std::vector<std::string> &var_list)
 
         FieldBlock &Ublk = fld->field(fid_U, iblock);
         FieldBlock &PVblk = fld->field(fid_PV, iblock);
+        FieldBlock &divBblk = fld->field(fid_divB, iblock);
         FieldBlock *Bcblk_ptr = nullptr;
         if (need_B)
             Bcblk_ptr = &fld->field(fid_Bc, iblock);
@@ -355,6 +357,10 @@ void MHD_Output::output_plt_field(const std::vector<std::string> &var_list)
                             else if (name == "Bz" && need_B)
                             {
                                 val = (*Bcblk_ptr)(ic, jc, kc, 2);
+                            }
+                            else if (name == "divB" && need_B)
+                            {
+                                val = divBblk(ic, jc, kc, 0);
                             }
                             else
                             {
@@ -454,6 +460,10 @@ void MHD_Output::output_plt_field(const std::vector<std::string> &var_list)
                                 else if (name == "Bz" && need_B)
                                 {
                                     val = (*Bcblk_ptr)(ic, jc, kc, 2);
+                                }
+                                else if (name == "divB" && need_B)
+                                {
+                                    val = divBblk(ic, jc, kc, 0);
                                 }
                                 else
                                 {
@@ -611,6 +621,7 @@ void MHD_Output::output_plt_cell_field(const std::vector<std::string> &var_list)
     //============================== 4. 找到需要的 Field ==============================
     const int fid_U = fld->field_id("U_");
     const int fid_PV = fld->field_id("PV_");
+    const int fid_divB = fld->field_id("divB");
 
     const FieldDescriptor &descU = fld->descriptor(fid_U);
     if (descU.location != StaggerLocation::Cell || descU.ncomp < 5)
@@ -651,6 +662,7 @@ void MHD_Output::output_plt_cell_field(const std::vector<std::string> &var_list)
 
         FieldBlock &Ublk = fld->field(fid_U, iblock);
         FieldBlock &PVblk = fld->field(fid_PV, iblock);
+        FieldBlock &divBblk = fld->field(fid_divB, iblock);
         FieldBlock *Bcblk_ptr = nullptr;
         if (need_B)
             Bcblk_ptr = &fld->field(fid_Bc, iblock);
@@ -716,6 +728,10 @@ void MHD_Output::output_plt_cell_field(const std::vector<std::string> &var_list)
                         else if (name == "Bz" && need_B)
                         {
                             val = (*Bcblk_ptr)(ic, jc, kc, 2);
+                        }
+                        else if (name == "divB" && need_B)
+                        {
+                            val = divBblk(ic, jc, kc, 0);
                         }
                         else
                         {
@@ -796,6 +812,10 @@ void MHD_Output::output_plt_cell_field(const std::vector<std::string> &var_list)
                         else if (name == "Bz" && need_B)
                         {
                             val = (*Bcblk_ptr)(ic, jc, kc, 2);
+                        }
+                        else if (name == "divB" && need_B)
+                        {
+                            val = divBblk(ic, jc, kc, 0);
                         }
                         else
                         {
