@@ -118,13 +118,13 @@ void Halo::build_parallel_edge_pattern(StaggerLocation loc, int nghost)
         }
     };
 
-    auto map_dir_to_neighbor = [&](int dir_local, const TOPO::IndexTransform &tr) -> int
+    auto map_dir_to_neighbor = [&](int dir_local, const TOPO::IndexTransform &tr, bool is_norm) -> int
     {
         int axis_local = std::abs(dir_local) - 1;
         int axis_nb = tr.perm[axis_local];
-        int s_local = (dir_local > 0) ? -1 : 1;
-        int s_nb = tr.sign[axis_local] * s_local; // 外法向翻转
-        return s_nb * (axis_nb + 1);
+        int s_local = (dir_local > 0) ? tr.sign[axis_local] : -tr.sign[axis_local]; // sign为翻转，dir_local正负为大小号面
+        int s_multi = (is_norm) ? -s_local : s_local;                               // 法向面需要额外翻转
+        return s_multi * (axis_nb + 1);
     };
 
     for (TOPO::EdgePatch &ep : topo_->parallel_edge_patches)
@@ -137,8 +137,8 @@ void Halo::build_parallel_edge_pattern(StaggerLocation loc, int nghost)
         int this_dir2 = ep.dir2;
 
         // 映射到邻居块坐标的方向
-        int tar_dir1_i = map_dir_to_neighbor(this_dir1, ep.trans);
-        int tar_dir2_i = map_dir_to_neighbor(this_dir2, ep.trans);
+        int tar_dir1_i = map_dir_to_neighbor(this_dir1, ep.trans, true);
+        int tar_dir2_i = map_dir_to_neighbor(this_dir2, ep.trans, false);
 
         // 保证 tar_dir1 是「接触面的法向」，和 ep.dir1 变换一致
         if (ep.trans.perm[std::abs(ep.dir1) - 1] + 1 != std::abs(tar_dir1_i))
@@ -409,13 +409,13 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
         }
     };
 
-    auto map_dir_to_neighbor = [&](int dir_local, const TOPO::IndexTransform &tr) -> int
+    auto map_dir_to_neighbor = [&](int dir_local, const TOPO::IndexTransform &tr, bool is_norm) -> int
     {
         int axis_local = std::abs(dir_local) - 1;
         int axis_nb = tr.perm[axis_local];
-        int s_local = (dir_local > 0) ? -1 : 1;
-        int s_nb = tr.sign[axis_local] * s_local; // 外法向翻转
-        return s_nb * (axis_nb + 1);
+        int s_local = (dir_local > 0) ? tr.sign[axis_local] : -tr.sign[axis_local]; // sign为翻转，dir_local正负为大小号面
+        int s_multi = (is_norm) ? -s_local : s_local;                               // 法向面需要额外翻转
+        return s_multi * (axis_nb + 1);
     };
 
     for (TOPO::VertexPatch &vp : topo_->parallel_vertex_patches)
@@ -429,9 +429,9 @@ void Halo::build_parallel_vertex_pattern(StaggerLocation loc, int nghost)
         int this_dir3 = vp.dir3;
 
         // 映射到邻居块坐标的方向
-        int tar_dir1_i = map_dir_to_neighbor(this_dir1, vp.trans);
-        int tar_dir2_i = map_dir_to_neighbor(this_dir2, vp.trans);
-        int tar_dir3_i = map_dir_to_neighbor(this_dir3, vp.trans);
+        int tar_dir1_i = map_dir_to_neighbor(this_dir1, vp.trans, true);
+        int tar_dir2_i = map_dir_to_neighbor(this_dir2, vp.trans, false);
+        int tar_dir3_i = map_dir_to_neighbor(this_dir3, vp.trans, false);
 
         // 保证 tar_dir1 是「接触面的法向」，和 ep.dir1 变换一致
         if (vp.trans.perm[std::abs(vp.dir1) - 1] + 1 != std::abs(tar_dir1_i))
