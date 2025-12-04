@@ -62,7 +62,7 @@ void Halo::build_inner_pattern(StaggerLocation loc, int nghost)
             return Direction::ZPlus;
 
         // 如果都不是，先简单报错，便于调试
-        throw std::runtime_error("detect_direction: cannot determine direction from node_box");
+        throw std::runtime_error("detect_direction: cannot determine direction from node_box in build_inner_pattern");
     };
 
     PatternKey key{loc, nghost};
@@ -190,7 +190,7 @@ void Halo::build_parallel_pattern(StaggerLocation loc, int nghost)
         if (face.lo.k == blk_mxyz.k && face.hi.k == blk_mxyz.k + 1)
             return Direction::ZPlus;
 
-        throw std::runtime_error("detect_direction: cannot determine direction from node_box");
+        throw std::runtime_error("detect_direction: cannot determine direction from node_box in build_parallel_pattern");
     };
 
     PatternKey key{loc, nghost};
