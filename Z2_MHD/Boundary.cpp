@@ -143,9 +143,9 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
                 w0 = vec_v[2];
 
                 // 消去法向分量，保留切向
-                // double dot_product = dot(vec_v, vec_face);
-                // vec_v = minus(vec_v, scalar(vec_face, dot_product));
-                vec_v = {0.0, 0.0, 0.0};
+                double dot_product = dot(vec_v, vec_face);
+                vec_v = minus(vec_v, scalar(vec_face, dot_product));
+                // vec_v = {0.0, 0.0, 0.0};
 
                 Bx = Bcell(i, j, k, 0);
                 By = Bcell(i, j, k, 1);
