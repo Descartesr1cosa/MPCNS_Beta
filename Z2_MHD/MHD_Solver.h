@@ -63,6 +63,9 @@ public:
         std::string Bcell_string = "B_cell";
         // 0. halo + 物理边界 + 计算Bcell + PV_
         {
+            // 计算更新B_cell
+            calc_Bcell();
+
             // 传递更新虚网格的主控变量 U_ B_xi eta zeta
             bound_.add_boundary(Solver_Name_);
             for (auto &fld_name : Solver_Name_)
@@ -71,9 +74,6 @@ public:
             }
             halo_->data_trans_2DCorner(U_string);
             halo_->data_trans_3DCorner(U_string);
-
-            // 计算更新B_cell
-            calc_Bcell();
 
             // 计算原始变量
             calc_PV();
@@ -95,6 +95,9 @@ public:
 
             // 4. halo + 物理边界+ 计算Bcell + PV_
             {
+                // 计算更新B_cell
+                calc_Bcell();
+
                 // 传递更新虚网格的主控变量 U_ B_xi eta zeta
                 bound_.add_boundary(Solver_Name_);
                 for (auto &fld_name : Solver_Name_)
@@ -103,9 +106,6 @@ public:
                 }
                 halo_->data_trans_2DCorner(U_string);
                 halo_->data_trans_3DCorner(U_string);
-
-                // 计算更新B_cell
-                calc_Bcell();
 
                 // 计算原始变量
                 calc_PV();
@@ -252,6 +252,7 @@ private:
         for (int ib = 0; ib < nblock; ++ib)
         {
             auto &Bcell = fld_->field(fid_Bcell, ib);
+            auto &U = fld_->field(fid_U, ib);
             auto &Bxi = fld_->field(fid_Bxi, ib);
             auto &Beta = fld_->field(fid_Beta, ib);
             auto &Bzeta = fld_->field(fid_Bzeta, ib);
@@ -319,6 +320,13 @@ private:
                         const double By_tot = By_ind + B_add_y;
                         const double Bz_tot = Bz_ind + B_add_z;
 
+                        //----- 2.5 修改磁场和磁能----
+                        const double Bx_tot_old = Bcell(i, j, k, 0);
+                        const double By_tot_old = Bcell(i, j, k, 1);
+                        const double Bz_tot_old = Bcell(i, j, k, 2);
+                        const double Delta_Eb = 0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) - 0.5 * inver_MA2 * (Bx_tot_old * Bx_tot_old + By_tot_old * By_tot_old + Bz_tot_old * Bz_tot_old);
+
+                        U(i, j, k, 4) += Delta_Eb;
                         Bcell(i, j, k, 0) = Bx_tot;
                         Bcell(i, j, k, 1) = By_tot;
                         Bcell(i, j, k, 2) = Bz_tot;
