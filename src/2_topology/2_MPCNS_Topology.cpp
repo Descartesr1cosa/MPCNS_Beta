@@ -348,6 +348,9 @@ namespace TOPO
         }
         //=======================================================================
 
+        build_edge_patches(grid, topo, dimension);
+        build_vertex_patches(grid, topo, dimension);
+
         if (my_rank == 0)
         {
             std::cout << "*************Finish the Topology Manipulating Process! !**************\n\n";
