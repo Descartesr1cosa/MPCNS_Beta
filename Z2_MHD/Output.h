@@ -46,6 +46,7 @@ public:
     void output_plt_field() { output_plt_field(var_defaut_plt_name); };
     // 可以指定要输出的字段名
     void output_plt_field(const std::vector<std::string> &var_list);
+    void output_plt_cell_field(const std::vector<std::string> &var_list);
     //=====================================================
 
 private:
