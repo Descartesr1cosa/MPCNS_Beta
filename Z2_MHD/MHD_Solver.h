@@ -64,11 +64,11 @@ public:
         // 0. halo + 物理边界 + 计算Bcell + PV_
         {
             // 传递更新虚网格的主控变量 U_ B_xi eta zeta
+            bound_.add_boundary(Solver_Name_);
             for (auto &fld_name : Solver_Name_)
             {
                 halo_->data_trans(fld_name);
             }
-            bound_.add_boundary(Solver_Name_);
             halo_->data_trans_2DCorner(U_string);
             halo_->data_trans_3DCorner(U_string);
 
@@ -96,11 +96,11 @@ public:
             // 4. halo + 物理边界+ 计算Bcell + PV_
             {
                 // 传递更新虚网格的主控变量 U_ B_xi eta zeta
+                bound_.add_boundary(Solver_Name_);
                 for (auto &fld_name : Solver_Name_)
                 {
                     halo_->data_trans(fld_name);
                 }
-                bound_.add_boundary(Solver_Name_);
                 halo_->data_trans_2DCorner(U_string);
                 halo_->data_trans_3DCorner(U_string);
 
