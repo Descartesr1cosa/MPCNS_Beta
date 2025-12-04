@@ -133,18 +133,29 @@ private:
         // 1) 构造 U_initial（包含 B_add 的能量）
         Initial_Transfer(U_initial, par);
 
+        // 无量纲 B_add
+        double Bx = par->GetDou("B_add_x");
+        double By = par->GetDou("B_add_y");
+        double Bz = par->GetDou("B_add_z");
+
         for (int32_t iblock = 0; iblock < fld->num_blocks(); iblock++)
         {
             double1D &uinitial = U_initial["U_"];
 
             FieldBlock &Ublk = fld->field("U_", iblock);
+            FieldBlock &B_cell = fld->field("B_cell", iblock);
             const Int3 &sub = Ublk.get_lo();
             const Int3 &sup = Ublk.get_hi();
             for (int i = sub.i; i < sup.i; i++)
                 for (int j = sub.j; j < sup.j; j++)
                     for (int k = sub.k; k < sup.k; k++)
+                    {
                         for (int32_t ll = 0; ll < desc.ncomp; ll++)
                             Ublk(i, j, k, ll) = uinitial(ll);
+                        B_cell(i, j, k, 0) = Bx;
+                        B_cell(i, j, k, 1) = By;
+                        B_cell(i, j, k, 2) = Bz;
+                    }
         }
 
         par->AddParam("Physic_Time", 0.0);
