@@ -58,21 +58,32 @@ public:
 
     void Advance()
     {
+        std::string U_string = "U_";
+        std::string Bcell_string = "B_cell";
         // 0. halo + 物理边界 + 计算Bcell + PV_
         {
-            for (const auto &fld_name : Solver_Name_)
+            // 传递更新虚网格的主控变量 U_ B_xi eta zeta
+            for (auto &fld_name : Solver_Name_)
             {
-                halo_->exchange_inner(fld_name);
-                halo_->exchange_parallel(fld_name);
+                halo_->data_trans(fld_name);
             }
             bound_.add_boundary(Solver_Name_);
+            halo_->data_trans_2DCorner(U_string);
+            halo_->data_trans_3DCorner(U_string);
 
+            // 计算更新B_cell
             calc_Bcell_inner();
+            halo_->data_trans(Bcell_string);
+            halo_->data_trans_2DCorner(Bcell_string);
+            halo_->data_trans_3DCorner(Bcell_string);
 
+            // 计算原始变量
             calc_PV();
 
             copy_field();
         }
+        output_.output_plt_field();
+        // return;
 
         while (true)
         {
@@ -88,15 +99,22 @@ public:
 
             // 4. halo + 物理边界+ 计算Bcell + PV_
             {
-                for (const auto &fld_name : Solver_Name_)
+                // 传递更新虚网格的主控变量 U_ B_xi eta zeta
+                for (auto &fld_name : Solver_Name_)
                 {
-                    halo_->exchange_inner(fld_name);
-                    halo_->exchange_parallel(fld_name);
+                    halo_->data_trans(fld_name);
                 }
                 bound_.add_boundary(Solver_Name_);
+                halo_->data_trans_2DCorner(U_string);
+                halo_->data_trans_3DCorner(U_string);
 
+                // 计算更新B_cell
                 calc_Bcell_inner();
+                halo_->data_trans(Bcell_string);
+                halo_->data_trans_2DCorner(Bcell_string);
+                halo_->data_trans_3DCorner(Bcell_string);
 
+                // 计算原始变量
                 calc_PV();
 
                 copy_field();
