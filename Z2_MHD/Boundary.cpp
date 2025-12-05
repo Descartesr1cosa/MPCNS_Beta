@@ -1,7 +1,7 @@
 #include "Boundary.h"
 #include "array"
 
-void MHD_Boundary::apply_cell_patch_U(const TOPO::PhysicalPatch &patch, int32_t field_id)
+void MHD_Boundary::apply_cell_patch_U(PhysicalRegion &patch, int32_t field_id)
 {
     const int ib = patch.this_block;
     FieldBlock &U = fld_->field(field_id, ib);      // 该块上的 U
@@ -30,50 +30,56 @@ void MHD_Boundary::apply_cell_patch_U(const TOPO::PhysicalPatch &patch, int32_t 
     }
 }
 
-void MHD_Boundary::apply_cell_copy(FieldBlock &U, const TOPO::PhysicalPatch &patch)
+void MHD_Boundary::apply_cell_copy(FieldBlock &U, PhysicalRegion &patch)
 {
     const FieldDescriptor &desc = U.descriptor();
     const int ngh = desc.nghost;
-    const Int3 lo = patch.this_box_node.lo; // 含 ghost 的逻辑下界
-    const Int3 hi = patch.this_box_node.hi; // 含 ghost 的逻辑上界（不含）
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
     const int ncomp = desc.ncomp;
 
-    int cycle[3] = {patch.raw->cycle[0], patch.raw->cycle[1], patch.raw->cycle[2]};
-
-    // 根据 direction 判断偏移量
-    int shift = (patch.direction > 0) ? 1 : 0;
-
-    for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
-    {
-        for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
-            for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
-                for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
+    int32_t i, j, k;
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
+            for (int32_t kk = lo.k; kk < hi.k; kk++)
+            {
+                // ii jj kk在边界面上循环，属于计算网格范围
+                for (int32_t ng = 1; ng <= ngg; ng++)
                 {
+                    // i j k在虚网格上循环
+                    i = ii + ng * cyc.i;
+                    j = jj + ng * cyc.j;
+                    k = kk + ng * cyc.k;
+
                     for (int m = 0; m < ncomp; ++m)
-                        U(i, j, k, m) = U(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), m);
+                        U(i, j, k, m) = U(ii, jj, kk, m);
                 }
-    }
+            }
 }
 
-void MHD_Boundary::apply_cell_farfield(FieldBlock &U, const TOPO::PhysicalPatch &patch)
+void MHD_Boundary::apply_cell_farfield(FieldBlock &U, PhysicalRegion &patch)
 {
     const FieldDescriptor &desc = U.descriptor();
     const int ngh = desc.nghost;
-    const Int3 lo = patch.this_box_node.lo; // 含 ghost 的逻辑下界
-    const Int3 hi = patch.this_box_node.hi; // 含 ghost 的逻辑上界（不含）
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
     const int ncomp = desc.ncomp;
 
-    int cycle[3] = {patch.raw->cycle[0], patch.raw->cycle[1], patch.raw->cycle[2]};
-
-    // 根据 direction 判断偏移量
-    int shift = (patch.direction > 0) ? 1 : 0;
-
-    for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
-    {
-        for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
-            for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
-                for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
+    int32_t i, j, k;
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
+            for (int32_t kk = lo.k; kk < hi.k; kk++)
+            {
+                // ii jj kk在边界面上循环，属于计算网格范围
+                for (int32_t ng = 1; ng <= ngg; ng++)
                 {
+                    // i j k在虚网格上循环
+                    i = ii + ng * cyc.i;
+                    j = jj + ng * cyc.j;
+                    k = kk + ng * cyc.k;
+
                     U(i, j, k, 0) = farfield_rho;
                     U(i, j, k, 1) = farfield_rho * farfield_u;
                     U(i, j, k, 2) = farfield_rho * farfield_v;
@@ -81,10 +87,10 @@ void MHD_Boundary::apply_cell_farfield(FieldBlock &U, const TOPO::PhysicalPatch 
                     U(i, j, k, 4) = 0.5 * farfield_rho * (farfield_u * farfield_u + farfield_v * farfield_v + farfield_w * farfield_w) + farfield_p / (gamma_ - 1.0);
                     U(i, j, k, 4) += 0.5 * inver_MA2 * (farfield_bx * farfield_bx + farfield_by * farfield_by + farfield_bz * farfield_bz);
                 }
-    }
+            }
 }
 
-void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO::PhysicalPatch &patch)
+void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalRegion &patch)
 {
     auto dot = [&](const std::array<double, 3> &a, const std::array<double, 3> &b)
     {
@@ -103,49 +109,54 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
 
     const FieldDescriptor &desc = U.descriptor();
     const int ngh = desc.nghost;
-    const Int3 lo = patch.this_box_node.lo; // 含 ghost 的逻辑下界
-    const Int3 hi = patch.this_box_node.hi; // 含 ghost 的逻辑上界（不含）
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
     const int ncomp = desc.ncomp;
 
-    int cycle[3] = {patch.raw->cycle[0], patch.raw->cycle[1], patch.raw->cycle[2]};
+    double sign = (patch.raw->direction > 0) ? -1.0 : 1.0; // 使得face的面积矢量指向流体侧面
 
-    // 根据 direction 判断偏移量
-    int shift = (patch.direction > 0) ? 1 : 0;
-    double sign = (patch.direction > 0) ? -1.0 : 1.0; // 使得face的面积矢量指向流体侧面
-
+    int shift = (patch.raw->direction > 0) ? 1 : 0; // 根据 direction 判断偏移量，获得壁面法向矢量
     // 面积矢量
     FieldBlock *face;
-    if (cycle[0] != 0)
+    if (cyc.i != 0)
         face = &fld_->field("JDxi", patch.this_block);
-    else if (cycle[1] != 0)
+    else if (cyc.j != 0)
         face = &fld_->field("JDet", patch.this_block);
-    else if (cycle[2] != 0)
+    else if (cyc.k != 0)
         face = &fld_->field("JDze", patch.this_block);
 
     double p0, u0, v0, w0, rho0, Bx, By, Bz, Eb;
-    int ii, jj, kk;
+    double B_add_x = fld_->par->GetDou("B_add_x");
+    double B_add_y = fld_->par->GetDou("B_add_y");
+    double B_add_z = fld_->par->GetDou("B_add_z");
 
-    for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
-    {
-        for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
-            for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
-                for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
+    int32_t i, j, k;
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
+            for (int32_t kk = lo.k; kk < hi.k; kk++)
+            {
+                // ii jj kk在边界面上循环，属于计算网格范围
+                for (int32_t ng = 1; ng <= ngg; ng++)
                 {
-                    // 获得壁面ijk
-                    ii = i - cycle[0] * (g + shift);
-                    jj = j - cycle[1] * (g + shift);
-                    kk = k - cycle[2] * (g + shift);
+                    // i j k在虚网格上循环
+                    i = ii + ng * cyc.i;
+                    j = jj + ng * cyc.j;
+                    k = kk + ng * cyc.k;
 
-                    rho0 = U(ii, jj, kk, 0);
-                    std::array<double, 3> vec_face = {(*face)(ii + cycle[0] * shift, jj + cycle[1] * shift, kk + cycle[2] * shift, 0),
-                                                      (*face)(ii + cycle[0] * shift, jj + cycle[1] * shift, kk + cycle[2] * shift, 1),
-                                                      (*face)(ii + cycle[0] * shift, jj + cycle[1] * shift, kk + cycle[2] * shift, 2)};
+                    //===================================================================
+                    // 获得壁面法向矢量
+                    std::array<double, 3> vec_face = {(*face)(ii + cyc.i * shift, jj + cyc.j * shift, kk + cyc.k * shift, 0),
+                                                      (*face)(ii + cyc.i * shift, jj + cyc.j * shift, kk + cyc.k * shift, 1),
+                                                      (*face)(ii + cyc.i * shift, jj + cyc.j * shift, kk + cyc.k * shift, 2)};
                     double norm = fmax(sqrt(dot(vec_face, vec_face)), 1e-15);
+                    // 调整vec_face方向，使得其永远指向流体侧边
                     vec_face = scalar(vec_face, sign / norm);
-                    // 此时vec_face永远指向流体侧边
+
+                    // 获取壁面法向计算区域第一层流体参数
+                    rho0 = U(ii, jj, kk, 0);
                     std::array<double, 3> vec_v = {U(ii, jj, kk, 1), U(ii, jj, kk, 2), U(ii, jj, kk, 3)};
                     vec_v = scalar(vec_v, 1.0 / rho0);
-
                     u0 = vec_v[0];
                     v0 = vec_v[1];
                     w0 = vec_v[2];
@@ -155,13 +166,16 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
                     Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
                     p0 = (U(ii, jj, kk, 4) - 0.5 * rho0 * (u0 * u0 + v0 * v0 + w0 * w0) - Eb) * (gamma_ - 1.0);
 
-                    p0 = fmax(p0, 0.001);
-
+                    p0 = fmax(p0, 0.001); // floor防止压力过低，使用无压力梯度
+                    rho0 = 0.1;           // 吸收边界
                     // 虚网格法向分量反射，保留切向
                     double dot_product = 2.0 * dot(vec_v, vec_face);
                     vec_v = minus(vec_v, scalar(vec_face, dot_product));
-
-                    rho0 = 0.1; // 吸收边界
+                    // 壁面虚网格磁场直接忽略感应部分
+                    Bx = B_add_x;
+                    By = B_add_y;
+                    Bz = B_add_z;
+                    Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
 
                     U(i, j, k, 0) = rho0;
                     U(i, j, k, 1) = rho0 * vec_v[0];
@@ -169,87 +183,35 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
                     U(i, j, k, 3) = rho0 * vec_v[2];
                     U(i, j, k, 4) = p0 / (gamma_ - 1.0) + 0.5 * rho0 * dot(vec_v, vec_v) + Eb;
                 }
-    }
-
-    // // 壁面层
-    // for (int i = lo.i - cycle[0] * shift; i < hi.i - cycle[0] * shift; i++)
-    //     for (int j = lo.j - cycle[1] * shift; j < hi.j - cycle[1] * shift; j++)
-    //         for (int k = lo.k - cycle[2] * shift; k < hi.k - cycle[2] * shift; k++)
-    //         {
-    //             rho0 = U(i, j, k, 0);
-    //             std::array<double, 3> vec_face = {(*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 0),
-    //                                               (*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 1),
-    //                                               (*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 2)};
-    //             double norm = fmax(sqrt(dot(vec_face, vec_face)), 1e-15);
-    //             vec_face = scalar(vec_face, sign / norm);
-    //             // 此时vec_face永远指向流体侧边
-    //             std::array<double, 3> vec_v = {U(i, j, k, 1), U(i, j, k, 2), U(i, j, k, 3)};
-    //             vec_v = scalar(vec_v, 1.0 / rho0);
-
-    //             u0 = vec_v[0];
-    //             v0 = vec_v[1];
-    //             w0 = vec_v[2];
-
-    //             // 消去法向分量，保留切向
-    //             double dot_product = dot(vec_v, vec_face);
-    //             vec_v = minus(vec_v, scalar(vec_face, dot_product));
-    //             // vec_v = {0.0, 0.0, 0.0};
-
-    //             Bx = Bcell(i, j, k, 0);
-    //             By = Bcell(i, j, k, 1);
-    //             Bz = Bcell(i, j, k, 2);
-    //             Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
-    //             p0 = (U(i, j, k, 4) - 0.5 * rho0 * (u0 * u0 + v0 * v0 + w0 * w0) - Eb) * (gamma_ - 1.0);
-
-    //             p0 = fmax(p0, 0.001);
-
-    //             U(i, j, k, 1) = rho0 * vec_v[0];
-    //             U(i, j, k, 2) = rho0 * vec_v[1];
-    //             U(i, j, k, 3) = rho0 * vec_v[2];
-    //             U(i, j, k, 4) = p0 / (gamma_ - 1.0) + 0.5 * rho0 * dot(vec_v, vec_v) + Eb;
-    //         }
-
-    // for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
-    // {
-    //     for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
-    //         for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
-    //             for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
-    //             {
-    //                 for (int m = 0; m < ncomp; ++m)
-    //                     U(i, j, k, m) = U(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), m);
-    //             }
-    // }
+            }
 }
 
-void MHD_Boundary::apply_cell_pole(FieldBlock &U, const TOPO::PhysicalPatch &patch)
+void MHD_Boundary::apply_cell_pole(FieldBlock &U, PhysicalRegion &patch)
 {
     const FieldDescriptor &desc = U.descriptor();
     const int ngh = desc.nghost;
-    const Int3 lo = patch.this_box_node.lo; // 含 ghost 的逻辑下界
-    const Int3 hi = patch.this_box_node.hi; // 含 ghost 的逻辑上界（不含）
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
     const int ncomp = desc.ncomp;
 
-    int cycle[3] = {patch.raw->cycle[0], patch.raw->cycle[1], patch.raw->cycle[2]};
-
-    // 根据 direction 判断偏移量
-    int shift = (patch.direction > 0) ? -1 : 0;
-
-    int mz = fld_->grd->grids(patch.this_block).mz;
     double count;
     std::vector<double> temp;
     temp.resize(ncomp);
-    for (int i = lo.i + cycle[0] * shift; i < hi.i + cycle[0] * shift; i++)
-        for (int j = lo.j + cycle[1] * shift; j < hi.j + cycle[1] * shift; j++)
+    int mz = fld_->grd->grids(patch.this_block).mz;
+
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
         {
             for (int m = 0; m < ncomp; ++m)
                 temp[m] = 0.0;
             count = 0.0;
 
             // Sum
-            for (int k = 0; k < mz; k++)
+            for (int kk = 0; kk < mz; kk++)
             {
                 for (int m = 0; m < ncomp; ++m)
-                    temp[m] += U(i, j, k, m);
+                    temp[m] += U(ii, jj, kk, m);
                 count += 1.0;
             }
 
@@ -258,118 +220,97 @@ void MHD_Boundary::apply_cell_pole(FieldBlock &U, const TOPO::PhysicalPatch &pat
                 temp[m] /= count;
 
             // Unified
-            for (int k = 0; k < mz; k++)
+            for (int kk = 0; kk < mz; kk++)
                 for (int m = 0; m < ncomp; ++m)
-                    U(i, j, k, m) = temp[m];
+                    U(ii, jj, kk, m) = temp[m];
         }
 
     apply_cell_copy(U, patch);
 }
 
-void MHD_Boundary::apply_face_patch_B(const TOPO::PhysicalPatch &patch, int32_t field_id, StaggerLocation location)
+void MHD_Boundary::apply_face_patch_B(PhysicalRegion &patch, int32_t field_id, StaggerLocation location)
 {
     const int ib = patch.this_block;
     FieldBlock &U = fld_->field(field_id, ib); // 该face上的 U
 
-    int loc = -1;
-    switch (location)
-    {
-    case StaggerLocation::FaceXi:
-        loc = 0;
-        break;
-    case StaggerLocation::FaceEt:
-        loc = 1;
-        break;
-    case StaggerLocation::FaceZe:
-        loc = 2;
-        break;
-    default:
-        break;
-    }
+    // int loc = -1;
+    // switch (location)
+    // {
+    // case StaggerLocation::FaceXi:
+    //     loc = 0;
+    //     break;
+    // case StaggerLocation::FaceEt:
+    //     loc = 1;
+    //     break;
+    // case StaggerLocation::FaceZe:
+    //     loc = 2;
+    //     break;
+    // default:
+    //     break;
+    // }
 
-    // 这里你可以根据 patch.bc_name 判断是什么类型的边界
-    if (patch.bc_name == "Farfield")
-    {
-        apply_face_farfield(U, patch, loc);
-    }
-    else
-    {
-        // 默认给一个简单的拷贝边界
-        apply_face_copy(U, patch, loc);
-    }
+    // 默认给一个简单的拷贝边界
+    apply_face_copy(U, patch);
 }
 
-void MHD_Boundary::apply_face_copy(FieldBlock &U, const TOPO::PhysicalPatch &patch, int loc)
+void MHD_Boundary::apply_face_copy(FieldBlock &U, PhysicalRegion &patch)
 {
     const FieldDescriptor &desc = U.descriptor();
     const int ngh = desc.nghost;
-    const Int3 lo = patch.this_box_node.lo; // 含 ghost 的逻辑下界
-    const Int3 hi = patch.this_box_node.hi; // 含 ghost 的逻辑上界（不含）
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
     const int ncomp = desc.ncomp;
 
-    int cycle[3] = {patch.raw->cycle[0], patch.raw->cycle[1], patch.raw->cycle[2]};
-
-    // 根据 direction 判断偏移量
-    // int shift = (patch.direction > 0) ? 1 : 0;
-
-    int shift = -10086;
-
-    if (cycle[loc] != 0) // face方向与边界面法向一致，此方向范围[0,mx] 无需平移1 与node相同
-        shift = 0;
-    else // face方向与边界面法向不一致，此方向范围[0,mx) 大号面需平移1 与cell相同
-        shift = (patch.direction > 0) ? 1 : 0;
-
-    for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
-    {
-        for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
-            for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
-                for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
+    int32_t i, j, k;
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
+            for (int32_t kk = lo.k; kk < hi.k; kk++)
+            {
+                // ii jj kk在边界面上循环，属于计算网格范围
+                for (int32_t ng = 1; ng <= ngg; ng++)
                 {
+                    // i j k在虚网格上循环
+                    i = ii + ng * cyc.i;
+                    j = jj + ng * cyc.j;
+                    k = kk + ng * cyc.k;
+
                     for (int m = 0; m < ncomp; ++m)
-                        U(i, j, k, m) = U(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), m);
+                        U(i, j, k, m) = U(ii, jj, kk, m);
                 }
-    }
+            }
 }
 
-void MHD_Boundary::apply_face_farfield(FieldBlock &U, const TOPO::PhysicalPatch &patch, int loc)
+void MHD_Boundary::apply_cell_wall_B(FieldBlock &U, PhysicalRegion &patch)
 {
+
     const FieldDescriptor &desc = U.descriptor();
     const int ngh = desc.nghost;
-    const Int3 lo = patch.this_box_node.lo; // 含 ghost 的逻辑下界
-    const Int3 hi = patch.this_box_node.hi; // 含 ghost 的逻辑上界（不含）
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
     const int ncomp = desc.ncomp;
 
-    int cycle[3] = {patch.raw->cycle[0], patch.raw->cycle[1], patch.raw->cycle[2]};
+    double B_add_x = fld_->par->GetDou("B_add_x");
+    double B_add_y = fld_->par->GetDou("B_add_y");
+    double B_add_z = fld_->par->GetDou("B_add_z");
 
-    // 面积矢量
-    FieldBlock *face;
-    if (cycle[0] != 0)
-        face = &fld_->field("JDxi", patch.this_block);
-    else if (cycle[1] != 0)
-        face = &fld_->field("JDet", patch.this_block);
-    else if (cycle[2] != 0)
-        face = &fld_->field("JDze", patch.this_block);
-
-    int shift = -10086;
-
-    if (cycle[loc] != 0) // face方向与边界面法向一致，此方向范围[0,mx] 无需平移1 与node相同
-        shift = 0;
-    else // face方向与边界面法向不一致，此方向范围[0,mx) 大号面需平移1 与cell相同
-        shift = (patch.direction > 0) ? 1 : 0;
-
-    for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
-    {
-        for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
-            for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
-                for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
+    int32_t i, j, k;
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
+            for (int32_t kk = lo.k; kk < hi.k; kk++)
+            {
+                // ii jj kk在边界面上循环，属于计算网格范围
+                for (int32_t ng = 1; ng <= ngg; ng++)
                 {
-                    // 使用壁面的面积矢量
-                    // std::array<double, 3> vec_face = {(*face)(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), 0),
-                    //   (*face)(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), 1),
-                    //   (*face)(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), 2)};
+                    // i j k在虚网格上循环
+                    i = ii + ng * cyc.i;
+                    j = jj + ng * cyc.j;
+                    k = kk + ng * cyc.k;
 
-                    // U(i, j, k, 0) = farfield_bx * vec_face[0] + farfield_by * vec_face[1] + farfield_bz * vec_face[2];
-                    U(i, j, k, 0) = 0.0;
+                    U(i, j, k, 0) = B_add_x;
+                    U(i, j, k, 1) = B_add_y;
+                    U(i, j, k, 2) = B_add_z;
                 }
-    }
+            }
 }

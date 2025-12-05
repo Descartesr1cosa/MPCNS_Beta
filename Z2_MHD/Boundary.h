@@ -3,6 +3,180 @@
 
 class MHD_Boundary
 {
+private:
+    struct PhysicalRegion
+    {
+        //--------------------------------------------------------------------------
+        // Block_ID
+        int this_block; // 我是哪个 block
+        //--------------------------------------------------------------------------
+        // IJK_range
+        Box3 box_bound; // 真正的网格边界,一般为inner计算区域，不包含ghost 区
+        Int3 cycle;     // 往虚网格的方向（朝block外）
+        //--------------------------------------------------------------------------
+
+        std::string this_block_name;
+        int bc_id;                              // boundary_num
+        std::string bc_name;                    // boundary_name
+        const Physical_Boundary *raw = nullptr; // 回指原始结构
+    };
+
+    struct PhysicalPattern
+    {
+        StaggerLocation location; // Cell / FaceXi / ...
+        std::vector<PhysicalRegion> regions;
+    };
+
+    std::map<StaggerLocation, PhysicalPattern> phy_patterns_;
+
+    void build_boundary_pattern()
+    {
+        if (par_->GetInt("myid") == 0)
+            std::cout << "---->Start building boundary pattern...\n";
+        // Cell
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::Cell;
+            for (auto &p : topo_->physical_patches)
+            {
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                int sup[3] = {p.raw->sup[0], p.raw->sup[1], p.raw->sup[2]}; // 开区间，正好形成cell范围
+
+                sub[abs(p.direction) - 1] += (p.direction > 0) ? -1 : 0;
+                sup[abs(p.direction) - 1] += (p.direction > 0) ? 0 : 1;
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0]; // 开区间
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1]; // 开区间
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2]; // 开区间
+
+                tmp.regions.push_back(phy);
+            }
+            phy_patterns_[StaggerLocation::Cell] = std::move(tmp);
+        }
+
+        // FaceXi
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::FaceXi;
+            for (auto &p : topo_->physical_patches)
+            {
+                if (abs(p.direction) != 1)
+                    continue;
+
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                int sup[3] = {p.raw->sup[0] + 1, p.raw->sup[1], p.raw->sup[2]}; // 开区间
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0]; // 开区间
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1]; // 开区间
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2]; // 开区间
+
+                tmp.regions.push_back(phy);
+            }
+            phy_patterns_[StaggerLocation::FaceXi] = std::move(tmp);
+        }
+
+        // FaceEt
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::FaceEt;
+            for (auto &p : topo_->physical_patches)
+            {
+                if (abs(p.direction) != 2)
+                    continue;
+
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                int sup[3] = {p.raw->sup[0], p.raw->sup[1] + 1, p.raw->sup[2]}; // 开区间
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0]; // 开区间
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1]; // 开区间
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2]; // 开区间
+
+                tmp.regions.push_back(phy);
+            }
+            phy_patterns_[StaggerLocation::FaceEt] = std::move(tmp);
+        }
+
+        // FaceZe
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::FaceZe;
+            for (auto &p : topo_->physical_patches)
+            {
+                if (abs(p.direction) != 3)
+                    continue;
+
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                int sup[3] = {p.raw->sup[0], p.raw->sup[1], p.raw->sup[2] + 1}; // 开区间
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0]; // 开区间
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1]; // 开区间
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2]; // 开区间
+
+                tmp.regions.push_back(phy);
+            }
+            phy_patterns_[StaggerLocation::FaceZe] = std::move(tmp);
+        }
+        if (par_->GetInt("myid") == 0)
+            std::cout << "***********Finish the Physical Pattern building Process! !************\n\n"
+                      << std::flush;
+    }
+
 public:
     void add_boundary(std::string field_name)
     {
@@ -12,7 +186,7 @@ public:
 
         if (desc.location == StaggerLocation::Cell)
             // 遍历所有物理边界 patch
-            for (const auto &patch : topo_->physical_patches)
+            for (auto &patch : phy_patterns_[desc.location].regions)
             {
                 apply_cell_patch_U(patch, field_id);
             }
@@ -20,7 +194,7 @@ public:
                  desc.location == StaggerLocation::FaceEt ||
                  desc.location == StaggerLocation::FaceZe)
         {
-            for (const auto &patch : topo_->physical_patches)
+            for (auto &patch : phy_patterns_[desc.location].regions)
                 apply_face_patch_B(patch, field_id, desc.location);
         }
     };
@@ -39,13 +213,13 @@ public:
 
         if (desc.location == StaggerLocation::Cell)
             // 遍历所有物理边界 patch
-            for (const auto &patch : topo_->physical_patches)
+            for (auto &patch : phy_patterns_[desc.location].regions)
             {
-                const int ib = patch.this_block;
+                int ib = patch.this_block;
                 FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
                 if (patch.bc_name == "Pole")
                     apply_cell_pole(U, patch);
-                if (patch.bc_name == "Solid_Surface")
+                else if (patch.bc_name == "Solid_Surface")
                     apply_cell_wall_B(U, patch);
                 else
                     apply_cell_copy(U, patch);
@@ -61,6 +235,8 @@ public:
         par_ = par;
 
         calc_farfield_data();
+
+        build_boundary_pattern();
     }
 
 private:
@@ -70,22 +246,20 @@ private:
     Param *par_ = nullptr;
 
     // 一个 patch 代表某块上的一个物理边界片段
-    void apply_cell_patch_U(const TOPO::PhysicalPatch &patch, int32_t field_id);
+    void apply_cell_patch_U(PhysicalRegion &patch, int32_t field_id);
 
     // 一个 patch 代表某块上的一个物理边界片段
-    void apply_face_patch_B(const TOPO::PhysicalPatch &patch, int32_t field_id, StaggerLocation location);
+    void apply_face_patch_B(PhysicalRegion &patch, int32_t field_id, StaggerLocation location);
 
     // 针对不同边界类型做分发（根据 bc_name）
-    void apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO::PhysicalPatch &patch);
-    // void apply_bc_outflow(FieldBlock &U, const TOPO::PhysicalPatch &patch);
-    void apply_cell_farfield(FieldBlock &U, const TOPO::PhysicalPatch &patch);
-    void apply_cell_copy(FieldBlock &U, const TOPO::PhysicalPatch &patch);
-    void apply_cell_pole(FieldBlock &U, const TOPO::PhysicalPatch &patch);
+    void apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalRegion &patch);
+    void apply_cell_farfield(FieldBlock &U, PhysicalRegion &patch);
+    void apply_cell_copy(FieldBlock &U, PhysicalRegion &patch);
+    void apply_cell_pole(FieldBlock &U, PhysicalRegion &patch);
 
-    void apply_cell_wall_B(FieldBlock &U, const TOPO::PhysicalPatch &patch);
+    void apply_cell_wall_B(FieldBlock &U, PhysicalRegion &patch);
 
-    void apply_face_copy(FieldBlock &U, const TOPO::PhysicalPatch &patch, int loc);
-    void apply_face_farfield(FieldBlock &U, const TOPO::PhysicalPatch &patch, int loc);
+    void apply_face_copy(FieldBlock &U, PhysicalRegion &patch);
 
     void calc_farfield_data()
     {
@@ -139,8 +313,11 @@ private:
         farfield_bx = Bx;
         farfield_by = By;
         farfield_bz = Bz;
+
+        ngg = fld_->grd->ngg;
     };
 
+    int ngg;
     double Velocity_ref, numdensity_ref, T_ref, rho_ref, p_ref, M_A, c_A, gamma_, inver_MA2;
     double farfield_u, farfield_T, farfield_rho, farfield_v, farfield_w, farfield_p, farfield_bx, farfield_by, farfield_bz;
 
