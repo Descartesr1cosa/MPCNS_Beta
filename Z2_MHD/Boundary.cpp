@@ -123,43 +123,7 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
         face = &fld_->field("JDze", patch.this_block);
 
     double p0, u0, v0, w0, rho0, Bx, By, Bz, Eb;
-    // 壁面层
-    for (int i = lo.i - cycle[0] * shift; i < hi.i - cycle[0] * shift; i++)
-        for (int j = lo.j - cycle[1] * shift; j < hi.j - cycle[1] * shift; j++)
-            for (int k = lo.k - cycle[2] * shift; k < hi.k - cycle[2] * shift; k++)
-            {
-                rho0 = U(i, j, k, 0);
-                std::array<double, 3> vec_face = {(*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 0),
-                                                  (*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 1),
-                                                  (*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 2)};
-                double norm = fmax(sqrt(dot(vec_face, vec_face)), 1e-15);
-                vec_face = scalar(vec_face, sign / norm);
-                // 此时vec_face永远指向流体侧边
-                std::array<double, 3> vec_v = {U(i, j, k, 1), U(i, j, k, 2), U(i, j, k, 3)};
-                vec_v = scalar(vec_v, 1.0 / rho0);
-
-                u0 = vec_v[0];
-                v0 = vec_v[1];
-                w0 = vec_v[2];
-
-                // 消去法向分量，保留切向
-                double dot_product = dot(vec_v, vec_face);
-                vec_v = minus(vec_v, scalar(vec_face, dot_product));
-                // vec_v = {0.0, 0.0, 0.0};
-
-                Bx = Bcell(i, j, k, 0);
-                By = Bcell(i, j, k, 1);
-                Bz = Bcell(i, j, k, 2);
-                Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
-                p0 = (U(i, j, k, 4) - 0.5 * rho0 * (u0 * u0 + v0 * v0 + w0 * w0) - Eb) * (gamma_ - 1.0);
-
-                p0 = fmax(p0, 0.001);
-
-                U(i, j, k, 1) = rho0 * vec_v[0];
-                U(i, j, k, 2) = rho0 * vec_v[1];
-                U(i, j, k, 3) = rho0 * vec_v[2];
-                U(i, j, k, 4) = p0 / (gamma_ - 1.0) + 0.5 * rho0 * dot(vec_v, vec_v) + Eb;
-            }
+    int ii, jj, kk;
 
     for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
     {
@@ -167,10 +131,94 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, const TOPO:
             for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
                 for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
                 {
-                    for (int m = 0; m < ncomp; ++m)
-                        U(i, j, k, m) = U(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), m);
+                    // 获得壁面ijk
+                    ii = i - cycle[0] * (g + shift);
+                    jj = j - cycle[1] * (g + shift);
+                    kk = k - cycle[2] * (g + shift);
+
+                    rho0 = U(ii, jj, kk, 0);
+                    std::array<double, 3> vec_face = {(*face)(ii + cycle[0] * shift, jj + cycle[1] * shift, kk + cycle[2] * shift, 0),
+                                                      (*face)(ii + cycle[0] * shift, jj + cycle[1] * shift, kk + cycle[2] * shift, 1),
+                                                      (*face)(ii + cycle[0] * shift, jj + cycle[1] * shift, kk + cycle[2] * shift, 2)};
+                    double norm = fmax(sqrt(dot(vec_face, vec_face)), 1e-15);
+                    vec_face = scalar(vec_face, sign / norm);
+                    // 此时vec_face永远指向流体侧边
+                    std::array<double, 3> vec_v = {U(ii, jj, kk, 1), U(ii, jj, kk, 2), U(ii, jj, kk, 3)};
+                    vec_v = scalar(vec_v, 1.0 / rho0);
+
+                    u0 = vec_v[0];
+                    v0 = vec_v[1];
+                    w0 = vec_v[2];
+                    Bx = Bcell(ii, jj, kk, 0);
+                    By = Bcell(ii, jj, kk, 1);
+                    Bz = Bcell(ii, jj, kk, 2);
+                    Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
+                    p0 = (U(ii, jj, kk, 4) - 0.5 * rho0 * (u0 * u0 + v0 * v0 + w0 * w0) - Eb) * (gamma_ - 1.0);
+
+                    p0 = fmax(p0, 0.001);
+
+                    // 虚网格法向分量反射，保留切向
+                    double dot_product = 2.0 * dot(vec_v, vec_face);
+                    vec_v = minus(vec_v, scalar(vec_face, dot_product));
+
+                    rho0 = 0.1; // 吸收边界
+
+                    U(i, j, k, 0) = rho0;
+                    U(i, j, k, 1) = rho0 * vec_v[0];
+                    U(i, j, k, 2) = rho0 * vec_v[1];
+                    U(i, j, k, 3) = rho0 * vec_v[2];
+                    U(i, j, k, 4) = p0 / (gamma_ - 1.0) + 0.5 * rho0 * dot(vec_v, vec_v) + Eb;
                 }
     }
+
+    // // 壁面层
+    // for (int i = lo.i - cycle[0] * shift; i < hi.i - cycle[0] * shift; i++)
+    //     for (int j = lo.j - cycle[1] * shift; j < hi.j - cycle[1] * shift; j++)
+    //         for (int k = lo.k - cycle[2] * shift; k < hi.k - cycle[2] * shift; k++)
+    //         {
+    //             rho0 = U(i, j, k, 0);
+    //             std::array<double, 3> vec_face = {(*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 0),
+    //                                               (*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 1),
+    //                                               (*face)(i + cycle[0] * shift, j + cycle[1] * shift, k + cycle[2] * shift, 2)};
+    //             double norm = fmax(sqrt(dot(vec_face, vec_face)), 1e-15);
+    //             vec_face = scalar(vec_face, sign / norm);
+    //             // 此时vec_face永远指向流体侧边
+    //             std::array<double, 3> vec_v = {U(i, j, k, 1), U(i, j, k, 2), U(i, j, k, 3)};
+    //             vec_v = scalar(vec_v, 1.0 / rho0);
+
+    //             u0 = vec_v[0];
+    //             v0 = vec_v[1];
+    //             w0 = vec_v[2];
+
+    //             // 消去法向分量，保留切向
+    //             double dot_product = dot(vec_v, vec_face);
+    //             vec_v = minus(vec_v, scalar(vec_face, dot_product));
+    //             // vec_v = {0.0, 0.0, 0.0};
+
+    //             Bx = Bcell(i, j, k, 0);
+    //             By = Bcell(i, j, k, 1);
+    //             Bz = Bcell(i, j, k, 2);
+    //             Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
+    //             p0 = (U(i, j, k, 4) - 0.5 * rho0 * (u0 * u0 + v0 * v0 + w0 * w0) - Eb) * (gamma_ - 1.0);
+
+    //             p0 = fmax(p0, 0.001);
+
+    //             U(i, j, k, 1) = rho0 * vec_v[0];
+    //             U(i, j, k, 2) = rho0 * vec_v[1];
+    //             U(i, j, k, 3) = rho0 * vec_v[2];
+    //             U(i, j, k, 4) = p0 / (gamma_ - 1.0) + 0.5 * rho0 * dot(vec_v, vec_v) + Eb;
+    //         }
+
+    // for (int g = 1 - shift; g <= ngh - shift; ++g) // ghost 层
+    // {
+    //     for (int i = lo.i + cycle[0] * g; i < hi.i + cycle[0] * g; i++)
+    //         for (int j = lo.j + cycle[1] * g; j < hi.j + cycle[1] * g; j++)
+    //             for (int k = lo.k + cycle[2] * g; k < hi.k + cycle[2] * g; k++)
+    //             {
+    //                 for (int m = 0; m < ncomp; ++m)
+    //                     U(i, j, k, m) = U(i - cycle[0] * (g + shift), j - cycle[1] * (g + shift), k - cycle[2] * (g + shift), m);
+    //             }
+    // }
 }
 
 void MHD_Boundary::apply_cell_pole(FieldBlock &U, const TOPO::PhysicalPatch &patch)
