@@ -45,6 +45,8 @@ public:
                 FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
                 if (patch.bc_name == "Pole")
                     apply_cell_pole(U, patch);
+                if (patch.bc_name == "Solid_Surface")
+                    apply_cell_wall_B(U, patch);
                 else
                     apply_cell_copy(U, patch);
             }
@@ -79,6 +81,8 @@ private:
     void apply_cell_farfield(FieldBlock &U, const TOPO::PhysicalPatch &patch);
     void apply_cell_copy(FieldBlock &U, const TOPO::PhysicalPatch &patch);
     void apply_cell_pole(FieldBlock &U, const TOPO::PhysicalPatch &patch);
+
+    void apply_cell_wall_B(FieldBlock &U, const TOPO::PhysicalPatch &patch);
 
     void apply_face_copy(FieldBlock &U, const TOPO::PhysicalPatch &patch, int loc);
     void apply_face_farfield(FieldBlock &U, const TOPO::PhysicalPatch &patch, int loc);
