@@ -358,6 +358,78 @@ void MHDSolver::inv_induce()
         }
     }
 
+    for (auto &p : topo_->physical_patches)
+    {
+        if (p.bc_name != "Solid_Surface")
+            continue;
+
+        int iblk = p.this_block;
+        int direction = p.direction;
+        if (abs(direction) == 1)
+        {
+            auto &Eeta = fld_->field("E_eta", iblk);
+            sub = p.this_box_node.lo;
+            sup = p.this_box_node.hi;
+            for (int i = sub.i; i < sup.i; i++)
+                for (int j = sub.j; j < sup.j - 1; j++)
+                    for (int k = sub.k; k < sup.k; k++)
+                    {
+                        Eeta(i, j, k, 0) = 0.0;
+                    }
+            auto &Ezeta = fld_->field("E_zeta", iblk);
+            sub = p.this_box_node.lo;
+            sup = p.this_box_node.hi;
+            for (int i = sub.i; i < sup.i; i++)
+                for (int j = sub.j; j < sup.j; j++)
+                    for (int k = sub.k; k < sup.k - 1; k++)
+                    {
+                        Ezeta(i, j, k, 0) = 0.0;
+                    }
+        }
+        else if (abs(direction) == 2)
+        {
+            auto &Exi = fld_->field("E_xi", iblk);
+            sub = p.this_box_node.lo;
+            sup = p.this_box_node.hi;
+            for (int i = sub.i; i < sup.i - 1; i++)
+                for (int j = sub.j; j < sup.j; j++)
+                    for (int k = sub.k; k < sup.k; k++)
+                    {
+                        Exi(i, j, k, 0) = 0.0;
+                    }
+            auto &Ezeta = fld_->field("E_zeta", iblk);
+            sub = p.this_box_node.lo;
+            sup = p.this_box_node.hi;
+            for (int i = sub.i; i < sup.i; i++)
+                for (int j = sub.j; j < sup.j; j++)
+                    for (int k = sub.k; k < sup.k - 1; k++)
+                    {
+                        Ezeta(i, j, k, 0) = 0.0;
+                    }
+        }
+        else if (abs(direction) == 3)
+        {
+            auto &Exi = fld_->field("E_xi", iblk);
+            sub = p.this_box_node.lo;
+            sup = p.this_box_node.hi;
+            for (int i = sub.i; i < sup.i - 1; i++)
+                for (int j = sub.j; j < sup.j; j++)
+                    for (int k = sub.k; k < sup.k; k++)
+                    {
+                        Exi(i, j, k, 0) = 0.0;
+                    }
+            auto &Eeta = fld_->field("E_eta", iblk);
+            sub = p.this_box_node.lo;
+            sup = p.this_box_node.hi;
+            for (int i = sub.i; i < sup.i; i++)
+                for (int j = sub.j; j < sup.j - 1; j++)
+                    for (int k = sub.k; k < sup.k; k++)
+                    {
+                        Eeta(i, j, k, 0) = 0.0;
+                    }
+        }
+    }
+
     // 计算RHS_xi
     for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)
     {
