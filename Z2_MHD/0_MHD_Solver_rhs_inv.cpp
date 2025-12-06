@@ -220,9 +220,32 @@ void MHDSolver::Reconstruction(double *metric, int32_t direction,
 
         double B_jac_total = B_jac_nabla + inner_product_add; // 法向通量仅仅为induced部分
         // 修正Bx By Bz保持法向分量的通量与感应CT值一致
-        Bx -= (inner_product - B_jac_total) * inver_norm2 * metric[0];
-        By -= (inner_product - B_jac_total) * inver_norm2 * metric[1];
-        Bz -= (inner_product - B_jac_total) * inver_norm2 * metric[2];
+        // double dBx, dBy, dBz;
+        // dBx = (inner_product - B_jac_total) * inver_norm2 * metric[0];
+        // dBy = (inner_product - B_jac_total) * inver_norm2 * metric[1];
+        // dBz = (inner_product - B_jac_total) * inver_norm2 * metric[2];
+        // double dB = sqrt(dBx * dBx + dBy * dBy + dBz * dBz);
+        // double B_mag = sqrt(Bx * Bx + By * By + Bz * Bz + 1E-20);
+        // double factor = 0.2;
+        // if (B_mag > 1)
+        // {
+        //     if (dB / B_mag > factor)
+        //     {
+        //         double alpha = factor / dB * B_mag;
+        //         Bx -= alpha * dBx;
+        //         By -= alpha * dBy;
+        //         Bz -= alpha * dBz;
+        //     }
+        //     else
+        //     {
+        //         Bx -= dBx;
+        //         By -= dBy;
+        //         Bz -= dBz;
+        //     }
+        // }
+        // Bx -= (inner_product - B_jac_total) * inver_norm2 * metric[0];
+        // By -= (inner_product - B_jac_total) * inver_norm2 * metric[1];
+        // Bz -= (inner_product - B_jac_total) * inver_norm2 * metric[2];
 
         pv[0] = u;
         pv[1] = v;
@@ -358,77 +381,77 @@ void MHDSolver::inv_induce()
         }
     }
 
-    for (auto &p : topo_->physical_patches)
-    {
-        if (p.bc_name != "Solid_Surface")
-            continue;
+    // for (auto &p : topo_->physical_patches)
+    // {
+    //     if (p.bc_name != "Solid_Surface")
+    //         continue;
 
-        int iblk = p.this_block;
-        int direction = p.direction;
-        if (abs(direction) == 1)
-        {
-            auto &Eeta = fld_->field("E_eta", iblk);
-            sub = p.this_box_node.lo;
-            sup = p.this_box_node.hi;
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j - 1; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                    {
-                        Eeta(i, j, k, 0) = 0.0;
-                    }
-            auto &Ezeta = fld_->field("E_zeta", iblk);
-            sub = p.this_box_node.lo;
-            sup = p.this_box_node.hi;
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k - 1; k++)
-                    {
-                        Ezeta(i, j, k, 0) = 0.0;
-                    }
-        }
-        else if (abs(direction) == 2)
-        {
-            auto &Exi = fld_->field("E_xi", iblk);
-            sub = p.this_box_node.lo;
-            sup = p.this_box_node.hi;
-            for (int i = sub.i; i < sup.i - 1; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                    {
-                        Exi(i, j, k, 0) = 0.0;
-                    }
-            auto &Ezeta = fld_->field("E_zeta", iblk);
-            sub = p.this_box_node.lo;
-            sup = p.this_box_node.hi;
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k - 1; k++)
-                    {
-                        Ezeta(i, j, k, 0) = 0.0;
-                    }
-        }
-        else if (abs(direction) == 3)
-        {
-            auto &Exi = fld_->field("E_xi", iblk);
-            sub = p.this_box_node.lo;
-            sup = p.this_box_node.hi;
-            for (int i = sub.i; i < sup.i - 1; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                    {
-                        Exi(i, j, k, 0) = 0.0;
-                    }
-            auto &Eeta = fld_->field("E_eta", iblk);
-            sub = p.this_box_node.lo;
-            sup = p.this_box_node.hi;
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j - 1; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                    {
-                        Eeta(i, j, k, 0) = 0.0;
-                    }
-        }
-    }
+    //     int iblk = p.this_block;
+    //     int direction = p.direction;
+    //     if (abs(direction) == 1)
+    //     {
+    //         auto &Eeta = fld_->field("E_eta", iblk);
+    //         sub = p.this_box_node.lo;
+    //         sup = p.this_box_node.hi;
+    //         for (int i = sub.i; i < sup.i; i++)
+    //             for (int j = sub.j; j < sup.j - 1; j++)
+    //                 for (int k = sub.k; k < sup.k; k++)
+    //                 {
+    //                     Eeta(i, j, k, 0) = 0.0;
+    //                 }
+    //         auto &Ezeta = fld_->field("E_zeta", iblk);
+    //         sub = p.this_box_node.lo;
+    //         sup = p.this_box_node.hi;
+    //         for (int i = sub.i; i < sup.i; i++)
+    //             for (int j = sub.j; j < sup.j; j++)
+    //                 for (int k = sub.k; k < sup.k - 1; k++)
+    //                 {
+    //                     Ezeta(i, j, k, 0) = 0.0;
+    //                 }
+    //     }
+    //     else if (abs(direction) == 2)
+    //     {
+    //         auto &Exi = fld_->field("E_xi", iblk);
+    //         sub = p.this_box_node.lo;
+    //         sup = p.this_box_node.hi;
+    //         for (int i = sub.i; i < sup.i - 1; i++)
+    //             for (int j = sub.j; j < sup.j; j++)
+    //                 for (int k = sub.k; k < sup.k; k++)
+    //                 {
+    //                     Exi(i, j, k, 0) = 0.0;
+    //                 }
+    //         auto &Ezeta = fld_->field("E_zeta", iblk);
+    //         sub = p.this_box_node.lo;
+    //         sup = p.this_box_node.hi;
+    //         for (int i = sub.i; i < sup.i; i++)
+    //             for (int j = sub.j; j < sup.j; j++)
+    //                 for (int k = sub.k; k < sup.k - 1; k++)
+    //                 {
+    //                     Ezeta(i, j, k, 0) = 0.0;
+    //                 }
+    //     }
+    //     else if (abs(direction) == 3)
+    //     {
+    //         auto &Exi = fld_->field("E_xi", iblk);
+    //         sub = p.this_box_node.lo;
+    //         sup = p.this_box_node.hi;
+    //         for (int i = sub.i; i < sup.i - 1; i++)
+    //             for (int j = sub.j; j < sup.j; j++)
+    //                 for (int k = sub.k; k < sup.k; k++)
+    //                 {
+    //                     Exi(i, j, k, 0) = 0.0;
+    //                 }
+    //         auto &Eeta = fld_->field("E_eta", iblk);
+    //         sub = p.this_box_node.lo;
+    //         sup = p.this_box_node.hi;
+    //         for (int i = sub.i; i < sup.i; i++)
+    //             for (int j = sub.j; j < sup.j - 1; j++)
+    //                 for (int k = sub.k; k < sup.k; k++)
+    //                 {
+    //                     Eeta(i, j, k, 0) = 0.0;
+    //                 }
+    //     }
+    // }
 
     // 计算RHS_xi
     for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)
