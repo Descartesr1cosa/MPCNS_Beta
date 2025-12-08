@@ -9,7 +9,7 @@ void MHDSolver::inv_fluid()
 
     Int3 sub, sup;
     double metric[3];
-    double Flux[5];
+    double Flux[8];
 
     for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)
     {
@@ -21,6 +21,7 @@ void MHDSolver::inv_fluid()
         // 计算XI面的通量
         {
             auto &flux_xi = fld_->field("F_xi", iblk);
+            auto &E_face_xi = fld_->field("E_face_xi", iblk);
             auto &B_face = fld_->field("B_xi", iblk);
             auto &XI = Xi_[iblk];
             sub = flux_xi.inner_lo();
@@ -35,12 +36,17 @@ void MHDSolver::inv_fluid()
                         Reconstruction(metric, 0, PV, U, Bcell, B_face(i, j, k, 0), iblk, i, j, k, Flux);
                         for (int m = 0; m < ncomp; m++)
                             flux_xi(i, j, k, m) = Flux[m];
+
+                        E_face_xi(i, j, k, 0) = Flux[5];
+                        E_face_xi(i, j, k, 1) = Flux[6];
+                        E_face_xi(i, j, k, 2) = Flux[7];
                     }
         }
 
         // 计算ETA面的通量
         {
             auto &flux_eta = fld_->field("F_eta", iblk);
+            auto &E_face_eta = fld_->field("E_face_eta", iblk);
             auto &B_face = fld_->field("B_eta", iblk);
             auto &ET = Eta_[iblk];
             sub = flux_eta.inner_lo();
@@ -56,12 +62,17 @@ void MHDSolver::inv_fluid()
                         Reconstruction(metric, 1, PV, U, Bcell, B_face(i, j, k, 0), iblk, i, j, k, Flux);
                         for (int m = 0; m < ncomp; m++)
                             flux_eta(i, j, k, m) = Flux[m];
+
+                        E_face_eta(i, j, k, 0) = Flux[5];
+                        E_face_eta(i, j, k, 1) = Flux[6];
+                        E_face_eta(i, j, k, 2) = Flux[7];
                     }
         }
 
         // 计算ZETA面的通量
         {
             auto &flux_zeta = fld_->field("F_zeta", iblk);
+            auto &E_face_zeta = fld_->field("E_face_zeta", iblk);
             auto &B_face = fld_->field("B_zeta", iblk);
             auto &ZETA = Zeta_[iblk];
             sub = flux_zeta.inner_lo();
@@ -77,6 +88,9 @@ void MHDSolver::inv_fluid()
                         Reconstruction(metric, 2, PV, U, Bcell, B_face(i, j, k, 0), iblk, i, j, k, Flux);
                         for (int m = 0; m < ncomp; m++)
                             flux_zeta(i, j, k, m) = Flux[m];
+                        E_face_zeta(i, j, k, 0) = Flux[5];
+                        E_face_zeta(i, j, k, 1) = Flux[6];
+                        E_face_zeta(i, j, k, 2) = Flux[7];
                     }
         }
     }
@@ -191,16 +205,16 @@ void MHDSolver::Reconstruction(double *metric, int32_t direction,
         // uvw = k1 * u + k2 * v + k3 * w; // With Hall Effect
 
         // flux[4] += inver_MA2 * (2.0 * P_B * uvw - (Bx * u + By * v + Bz * w) * B_Jac_nabla); // S(Poynting Vector) \cdot J\nabla \xi\eta\zeta
-        // flux[5] = uvw * Bx - B_Jac_nabla * u;
-        // flux[6] = uvw * By - B_Jac_nabla * v;
-        // flux[7] = uvw * Bz - B_Jac_nabla * w;
+        flux[5] = uvw * Bx - B_Jac_nabla * u;
+        flux[6] = uvw * By - B_Jac_nabla * v;
+        flux[7] = uvw * Bz - B_Jac_nabla * w;
     };
 
     int i = index_i;
     int j = index_j;
     int k = index_k;
 
-    double UL[5], UR[5], ppvvL[4], ppvvR[4], BL[4], BR[4];
+    double UL[8], UR[8], ppvvL[4], ppvvR[4], BL[4], BR[4];
     double radius[2];
 
     auto fill_state = [&](int ic, int jc, int kc, double *Ucons, double *pv, double *B)
@@ -257,6 +271,9 @@ void MHDSolver::Reconstruction(double *metric, int32_t direction,
         Ucons[2] = rho * v;
         Ucons[3] = rho * w;
         Ucons[4] = p / (gamma_ - 1.0) + 0.5 * rho * (u * u + v * v + w * w) + 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
+        Ucons[5] = Bx;
+        Ucons[6] = By;
+        Ucons[7] = Bz;
 
         B[0] = Bx;
         B[1] = By;
@@ -291,12 +308,20 @@ void MHDSolver::Reconstruction(double *metric, int32_t direction,
 
     double radius_max = std::max(radius[0], radius[1]);
 
-    double FL[5], FR[5];
+    double FL[8], FR[8];
     calc_Jac_Flux_GCL(FL, UL, ppvvL, BL, metric);
     calc_Jac_Flux_GCL(FR, UR, ppvvR, BR, metric);
 
-    for (int m = 0; m < 5; ++m)
+    for (int m = 0; m < 8; ++m)
         out_flux[m] = 0.5 * (FL[m] + FR[m]) - 0.5 * radius_max * (UR[m] - UL[m]);
+
+    // 对最后三个变量，B的通量进行旋转，获得face上的电场
+    // E_tangetial  =  - K \times Flux / |K^2|     K=\nabla\xi \eta \zeta
+    double Elec_flux[3] = {out_flux[5], out_flux[6], out_flux[7]};
+    double norm2 = -1.0 / (metric[0] * metric[0] + metric[1] * metric[1] + metric[2] * metric[2] + 1E-20);
+    out_flux[5] = norm2 * (metric[1] * Elec_flux[2] - metric[2] * Elec_flux[1]); // Averaged Electric in Face xi eta zeta
+    out_flux[6] = norm2 * (metric[2] * Elec_flux[0] - metric[0] * Elec_flux[2]); // Averaged Electric in Face xi eta zeta
+    out_flux[7] = norm2 * (metric[0] * Elec_flux[1] - metric[1] * Elec_flux[0]); // Averaged Electric in Face xi eta zeta
 }
 
 #endif
@@ -316,20 +341,20 @@ void MHDSolver::inv_induce()
 
         {
             auto &Exi = fld_->field("E_xi", iblk);
+            auto &E_face_eta = fld_->field("E_face_eta", iblk);
+            auto &E_face_zeta = fld_->field("E_face_zeta", iblk);
             sub = Exi.inner_lo();
             sup = Exi.inner_hi();
             for (int i = sub.i; i < sup.i; i++)
                 for (int j = sub.j; j < sup.j; j++)
                     for (int k = sub.k; k < sup.k; k++)
                     {
-                        vel = {0.25 * (PV(i, j, k, 0) + PV(i, j - 1, k, 0) + PV(i, j, k - 1, 0) + PV(i, j - 1, k - 1, 0)),
-                               0.25 * (PV(i, j, k, 1) + PV(i, j - 1, k, 1) + PV(i, j, k - 1, 1) + PV(i, j - 1, k - 1, 1)),
-                               0.25 * (PV(i, j, k, 2) + PV(i, j - 1, k, 2) + PV(i, j, k - 1, 2) + PV(i, j - 1, k - 1, 2))};
-                        B = {0.25 * (Bcell(i, j, k, 0) + Bcell(i, j - 1, k, 0) + Bcell(i, j, k - 1, 0) + Bcell(i, j - 1, k - 1, 0)),
-                             0.25 * (Bcell(i, j, k, 1) + Bcell(i, j - 1, k, 1) + Bcell(i, j, k - 1, 1) + Bcell(i, j - 1, k - 1, 1)),
-                             0.25 * (Bcell(i, j, k, 2) + Bcell(i, j - 1, k, 2) + Bcell(i, j, k - 1, 2) + Bcell(i, j - 1, k - 1, 2))};
-                        E = B ^ vel;
-                        dr = {x(i + 1, j, k) - x(i, j, k),
+
+                        E.vector[0] = 0.25 * (E_face_eta(i, j, k, 0) + E_face_eta(i, j, k - 1, 0) + E_face_zeta(i, j, k, 0) + E_face_zeta(i, j - 1, k, 0));
+                        E.vector[1] = 0.25 * (E_face_eta(i, j, k, 1) + E_face_eta(i, j, k - 1, 1) + E_face_zeta(i, j, k, 1) + E_face_zeta(i, j - 1, k, 1));
+                        E.vector[2] = 0.25 * (E_face_eta(i, j, k, 2) + E_face_eta(i, j, k - 1, 2) + E_face_zeta(i, j, k, 2) + E_face_zeta(i, j - 1, k, 2));
+
+                                               dr = {x(i + 1, j, k) - x(i, j, k),
                               y(i + 1, j, k) - y(i, j, k),
                               z(i + 1, j, k) - z(i, j, k)};
                         Exi(i, j, k, 0) = E * dr;
@@ -338,19 +363,18 @@ void MHDSolver::inv_induce()
 
         {
             auto &Eeta = fld_->field("E_eta", iblk);
+            auto &E_face_xi = fld_->field("E_face_xi", iblk);
+            auto &E_face_zeta = fld_->field("E_face_zeta", iblk);
             sub = Eeta.inner_lo();
             sup = Eeta.inner_hi();
             for (int i = sub.i; i < sup.i; i++)
                 for (int j = sub.j; j < sup.j; j++)
                     for (int k = sub.k; k < sup.k; k++)
                     {
-                        vel = {0.25 * (PV(i, j, k, 0) + PV(i - 1, j, k, 0) + PV(i, j, k - 1, 0) + PV(i - 1, j, k - 1, 0)),
-                               0.25 * (PV(i, j, k, 1) + PV(i - 1, j, k, 1) + PV(i, j, k - 1, 1) + PV(i - 1, j, k - 1, 1)),
-                               0.25 * (PV(i, j, k, 2) + PV(i - 1, j, k, 2) + PV(i, j, k - 1, 2) + PV(i - 1, j, k - 1, 2))};
-                        B = {0.25 * (Bcell(i, j, k, 0) + Bcell(i - 1, j, k, 0) + Bcell(i, j, k - 1, 0) + Bcell(i - 1, j, k - 1, 0)),
-                             0.25 * (Bcell(i, j, k, 1) + Bcell(i - 1, j, k, 1) + Bcell(i, j, k - 1, 1) + Bcell(i - 1, j, k - 1, 1)),
-                             0.25 * (Bcell(i, j, k, 2) + Bcell(i - 1, j, k, 2) + Bcell(i, j, k - 1, 2) + Bcell(i - 1, j, k - 1, 2))};
-                        E = B ^ vel;
+                        E.vector[0] = 0.25 * (E_face_xi(i, j, k, 0) + E_face_xi(i, j, k - 1, 0) + E_face_zeta(i, j, k, 0) + E_face_zeta(i - 1, j, k, 0));
+                        E.vector[1] = 0.25 * (E_face_xi(i, j, k, 1) + E_face_xi(i, j, k - 1, 1) + E_face_zeta(i, j, k, 1) + E_face_zeta(i - 1, j, k, 1));
+                        E.vector[2] = 0.25 * (E_face_xi(i, j, k, 2) + E_face_xi(i, j, k - 1, 2) + E_face_zeta(i, j, k, 2) + E_face_zeta(i - 1, j, k, 2));
+
                         dr = {x(i, j + 1, k) - x(i, j, k),
                               y(i, j + 1, k) - y(i, j, k),
                               z(i, j + 1, k) - z(i, j, k)};
@@ -360,19 +384,18 @@ void MHDSolver::inv_induce()
 
         {
             auto &Ezeta = fld_->field("E_zeta", iblk);
+            auto &E_face_xi = fld_->field("E_face_xi", iblk);
+            auto &E_face_eta = fld_->field("E_face_eta", iblk);
             sub = Ezeta.inner_lo();
             sup = Ezeta.inner_hi();
             for (int i = sub.i; i < sup.i; i++)
                 for (int j = sub.j; j < sup.j; j++)
                     for (int k = sub.k; k < sup.k; k++)
                     {
-                        vel = {0.25 * (PV(i, j, k, 0) + PV(i, j - 1, k, 0) + PV(i - 1, j, k, 0) + PV(i - 1, j - 1, k, 0)),
-                               0.25 * (PV(i, j, k, 1) + PV(i, j - 1, k, 1) + PV(i - 1, j, k, 1) + PV(i - 1, j - 1, k, 1)),
-                               0.25 * (PV(i, j, k, 2) + PV(i, j - 1, k, 2) + PV(i - 1, j, k, 2) + PV(i - 1, j - 1, k, 2))};
-                        B = {0.25 * (Bcell(i, j, k, 0) + Bcell(i, j - 1, k, 0) + Bcell(i - 1, j, k, 0) + Bcell(i - 1, j - 1, k, 0)),
-                             0.25 * (Bcell(i, j, k, 1) + Bcell(i, j - 1, k, 1) + Bcell(i - 1, j, k, 1) + Bcell(i - 1, j - 1, k, 1)),
-                             0.25 * (Bcell(i, j, k, 2) + Bcell(i, j - 1, k, 2) + Bcell(i - 1, j, k, 2) + Bcell(i - 1, j - 1, k, 2))};
-                        E = B ^ vel;
+                        E.vector[0] = 0.25 * (E_face_xi(i, j, k, 0) + E_face_xi(i, j - 1, k, 0) + E_face_eta(i, j, k, 0) + E_face_eta(i - 1, j, k, 0));
+                        E.vector[1] = 0.25 * (E_face_xi(i, j, k, 1) + E_face_xi(i, j - 1, k, 1) + E_face_eta(i, j, k, 1) + E_face_eta(i - 1, j, k, 1));
+                        E.vector[2] = 0.25 * (E_face_xi(i, j, k, 2) + E_face_xi(i, j - 1, k, 2) + E_face_eta(i, j, k, 2) + E_face_eta(i - 1, j, k, 2));
+
                         dr = {x(i, j, k + 1) - x(i, j, k),
                               y(i, j, k + 1) - y(i, j, k),
                               z(i, j, k + 1) - z(i, j, k)};
