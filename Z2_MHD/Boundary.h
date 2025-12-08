@@ -74,22 +74,38 @@ private:
             tmp.location = StaggerLocation::FaceXi;
             for (auto &p : topo_->physical_patches)
             {
-                if (abs(p.direction) != 1)
-                    continue;
-
                 PhysicalRegion phy;
                 phy.this_block = p.this_block;
                 phy.this_block_name = p.this_block_name;
                 phy.bc_id = p.bc_id;
                 phy.bc_name = p.bc_name;
                 phy.raw = p.raw;
-
                 phy.cycle.i = p.raw->cycle[0];
                 phy.cycle.j = p.raw->cycle[1];
                 phy.cycle.k = p.raw->cycle[2];
 
-                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
-                int sup[3] = {p.raw->sup[0] + 1, p.raw->sup[1], p.raw->sup[2]}; // 开区间
+                std::vector<int> sub, sup;
+                sub.resize(3);
+                sup.resize(3);
+                sub = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                sup = {p.raw->sup[0] + 1, p.raw->sup[1], p.raw->sup[2]}; // 开区间
+                if (abs(p.direction) == 1)
+                {
+                }
+                else if (abs(p.direction) == 2)
+                {
+                    if (p.direction < 0)
+                        sup[1] += 1;
+                    else
+                        sub[1] -= 1;
+                }
+                else if (abs(p.direction) == 3)
+                {
+                    if (p.direction < 0)
+                        sup[2] += 1;
+                    else
+                        sub[2] -= 1;
+                }
 
                 phy.box_bound.lo.i = sub[0];
                 phy.box_bound.hi.i = sup[0]; // 开区间
@@ -97,7 +113,6 @@ private:
                 phy.box_bound.hi.j = sup[1]; // 开区间
                 phy.box_bound.lo.k = sub[2];
                 phy.box_bound.hi.k = sup[2]; // 开区间
-
                 tmp.regions.push_back(phy);
             }
             phy_patterns_[StaggerLocation::FaceXi] = std::move(tmp);
@@ -109,22 +124,38 @@ private:
             tmp.location = StaggerLocation::FaceEt;
             for (auto &p : topo_->physical_patches)
             {
-                if (abs(p.direction) != 2)
-                    continue;
-
                 PhysicalRegion phy;
                 phy.this_block = p.this_block;
                 phy.this_block_name = p.this_block_name;
                 phy.bc_id = p.bc_id;
                 phy.bc_name = p.bc_name;
                 phy.raw = p.raw;
-
                 phy.cycle.i = p.raw->cycle[0];
                 phy.cycle.j = p.raw->cycle[1];
                 phy.cycle.k = p.raw->cycle[2];
 
-                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
-                int sup[3] = {p.raw->sup[0], p.raw->sup[1] + 1, p.raw->sup[2]}; // 开区间
+                std::vector<int> sub, sup;
+                sub.resize(3);
+                sup.resize(3);
+                sub = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                sup = {p.raw->sup[0], p.raw->sup[1] + 1, p.raw->sup[2]}; // 开区间
+                if (abs(p.direction) == 2)
+                {
+                }
+                else if (abs(p.direction) == 1)
+                {
+                    if (p.direction < 0)
+                        sup[0] += 1;
+                    else
+                        sub[0] -= 1;
+                }
+                else if (abs(p.direction) == 3)
+                {
+                    if (p.direction < 0)
+                        sup[2] += 1;
+                    else
+                        sub[2] -= 1;
+                }
 
                 phy.box_bound.lo.i = sub[0];
                 phy.box_bound.hi.i = sup[0]; // 开区间
@@ -144,22 +175,38 @@ private:
             tmp.location = StaggerLocation::FaceZe;
             for (auto &p : topo_->physical_patches)
             {
-                if (abs(p.direction) != 3)
-                    continue;
-
                 PhysicalRegion phy;
                 phy.this_block = p.this_block;
                 phy.this_block_name = p.this_block_name;
                 phy.bc_id = p.bc_id;
                 phy.bc_name = p.bc_name;
                 phy.raw = p.raw;
-
                 phy.cycle.i = p.raw->cycle[0];
                 phy.cycle.j = p.raw->cycle[1];
                 phy.cycle.k = p.raw->cycle[2];
 
-                int sub[3] = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
-                int sup[3] = {p.raw->sup[0], p.raw->sup[1], p.raw->sup[2] + 1}; // 开区间
+                std::vector<int> sub, sup;
+                sub.resize(3);
+                sup.resize(3);
+                sub = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                sup = {p.raw->sup[0], p.raw->sup[1], p.raw->sup[2] + 1}; // 开区间
+                if (abs(p.direction) == 3)
+                {
+                }
+                else if (abs(p.direction) == 1)
+                {
+                    if (p.direction < 0)
+                        sup[0] += 1;
+                    else
+                        sub[0] -= 1;
+                }
+                else if (abs(p.direction) == 2)
+                {
+                    if (p.direction < 0)
+                        sup[1] += 1;
+                    else
+                        sub[1] -= 1;
+                }
 
                 phy.box_bound.lo.i = sub[0];
                 phy.box_bound.hi.i = sup[0]; // 开区间
