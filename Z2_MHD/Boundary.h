@@ -112,7 +112,8 @@ public:
                 int ib = patch.this_block;
                 FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
                 if (patch.bc_name == "Solid_Surface")
-                    apply_derived_cell_wall(U, patch);
+                    apply_cell_copy(U, patch);
+                // apply_derived_cell_wall(U, patch);
                 else if (patch.bc_name == "Pole")
                     apply_cell_pole(U, patch);
                 else
