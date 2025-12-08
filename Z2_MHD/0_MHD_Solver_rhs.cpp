@@ -56,6 +56,13 @@ void MHDSolver::time_advance()
     //-----------------------------------------------------
     // Calc RHS Terms For Fluid Eqs
     inv_fluid();
+
+    std::vector<std::string> Electric_Face = {"E_face_xi", "E_face_eta", "E_face_zeta"};
+    bound_.add_boundary(Electric_Face);
+    halo_->data_trans(Electric_Face[0]);
+    halo_->data_trans(Electric_Face[1]);
+    halo_->data_trans(Electric_Face[2]);
+
     // Calc RHS Terms For MHD induced Eqs
     inv_induce();
     //-----------------------------------------------------

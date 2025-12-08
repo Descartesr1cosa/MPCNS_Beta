@@ -65,13 +65,13 @@ int main(int arg, char **argv)
     // 原始变量
     fld->register_field(
         FieldDescriptor{"PV_", StaggerLocation::Cell, 4, par->GetInt("ngg")});
-    // 网格界面(Face)的磁场向量
+    // 网格界面(Face)的电场向量，用于CT方法
     fld->register_field(
-        FieldDescriptor{"bi_temp", StaggerLocation::FaceXi, 3, par->GetInt("ngg")});
+        FieldDescriptor{"E_face_xi", StaggerLocation::FaceXi, 3, par->GetInt("ngg")});
     fld->register_field(
-        FieldDescriptor{"bj_temp", StaggerLocation::FaceEt, 3, par->GetInt("ngg")});
+        FieldDescriptor{"E_face_eta", StaggerLocation::FaceEt, 3, par->GetInt("ngg")});
     fld->register_field(
-        FieldDescriptor{"bk_temp", StaggerLocation::FaceZe, 3, par->GetInt("ngg")});
+        FieldDescriptor{"E_face_zeta", StaggerLocation::FaceZe, 3, par->GetInt("ngg")});
     //--------------------------------------------------------------------------
     // 建立Halo通信
     Halo *hal = new Halo(fld, &topology);
