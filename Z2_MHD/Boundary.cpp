@@ -1,35 +1,6 @@
 #include "Boundary.h"
 #include "array"
 
-void MHD_Boundary::apply_cell_patch_U(PhysicalRegion &patch, int32_t field_id)
-{
-    const int ib = patch.this_block;
-    FieldBlock &U = fld_->field(field_id, ib);      // 该块上的 U
-    FieldBlock &B_cell = fld_->field("B_cell", ib); // 该块上的 U
-
-    // 这里你可以根据 patch.bc_name 判断是什么类型的边界
-    if (patch.bc_name == "Solid_Surface")
-    {
-        apply_cell_wall(U, B_cell, patch);
-    }
-    else if (patch.bc_name == "Outflow")
-    {
-        // apply_bc_outflow(U, patch);
-        apply_cell_copy(U, patch);
-    }
-    else if (patch.bc_name == "Farfield")
-    {
-        apply_cell_farfield(U, patch);
-    }
-    else if (patch.bc_name == "Pole")
-        apply_cell_pole(U, patch);
-    else
-    {
-        // 默认给一个简单的拷贝边界
-        apply_cell_copy(U, patch);
-    }
-}
-
 void MHD_Boundary::apply_cell_copy(FieldBlock &U, PhysicalRegion &patch)
 {
     const FieldDescriptor &desc = U.descriptor();
@@ -228,31 +199,6 @@ void MHD_Boundary::apply_cell_pole(FieldBlock &U, PhysicalRegion &patch)
     apply_cell_copy(U, patch);
 }
 
-void MHD_Boundary::apply_face_patch_B(PhysicalRegion &patch, int32_t field_id, StaggerLocation location)
-{
-    const int ib = patch.this_block;
-    FieldBlock &U = fld_->field(field_id, ib); // 该face上的 U
-
-    // int loc = -1;
-    // switch (location)
-    // {
-    // case StaggerLocation::FaceXi:
-    //     loc = 0;
-    //     break;
-    // case StaggerLocation::FaceEt:
-    //     loc = 1;
-    //     break;
-    // case StaggerLocation::FaceZe:
-    //     loc = 2;
-    //     break;
-    // default:
-    //     break;
-    // }
-
-    // 默认给一个简单的拷贝边界
-    apply_face_copy(U, patch);
-}
-
 void MHD_Boundary::apply_face_copy(FieldBlock &U, PhysicalRegion &patch)
 {
     const FieldDescriptor &desc = U.descriptor();
@@ -281,7 +227,7 @@ void MHD_Boundary::apply_face_copy(FieldBlock &U, PhysicalRegion &patch)
             }
 }
 
-void MHD_Boundary::apply_cell_wall_B(FieldBlock &U, PhysicalRegion &patch)
+void MHD_Boundary::apply_derived_cell_wall(FieldBlock &U, PhysicalRegion &patch)
 {
 
     const FieldDescriptor &desc = U.descriptor();

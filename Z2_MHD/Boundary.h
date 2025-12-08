@@ -3,7 +3,146 @@
 
 class MHD_Boundary
 {
+public:
+    //===================================================================================
+    // 初始化，把需要用到的指针和 U_ 的 fid 记起来
+    void SetUp(Grid *grd, Field *fld, TOPO::Topology *topo, Param *par)
+    {
+        grd_ = grd;
+        fld_ = fld;
+        topo_ = topo;
+        par_ = par;
+
+        calc_farfield_data();
+
+        build_boundary_pattern();
+    }
+
+    // 仅仅对Cell施加边界条件
+    void add_Cell_boundary(std::string field_name)
+    {
+        int32_t field_id = fld_->field_id(field_name);
+        const FieldDescriptor &desc = fld_->descriptor(field_id);
+        // 用于分辨Cell Face Edge
+
+        // 用于辅助施加边界条件，这里不做修改
+        int32_t field_id_Bcell = fld_->field_id("B_cell");
+
+        if (desc.location == StaggerLocation::Cell)
+        {
+            // 遍历所有物理边界 patch
+            for (auto &patch : phy_patterns_[desc.location].regions)
+            {
+                const int ib = patch.this_block;
+                FieldBlock &U = fld_->field(field_id, ib);            // 该块上的 U
+                FieldBlock &B_cell = fld_->field(field_id_Bcell, ib); // 该块上的 B_cell
+
+                // 这里你可以根据 patch.bc_name 判断是什么类型的边界
+                if (patch.bc_name == "Solid_Surface")
+                {
+                    apply_cell_wall(U, B_cell, patch);
+                }
+                else if (patch.bc_name == "Outflow")
+                {
+                    apply_cell_copy(U, patch);
+                }
+                else if (patch.bc_name == "Farfield")
+                {
+                    apply_cell_farfield(U, patch);
+                }
+                else if (patch.bc_name == "Pole")
+                {
+                    apply_cell_pole(U, patch);
+                }
+                else
+                {
+                    // 默认给一个简单的拷贝边界
+                    apply_cell_copy(U, patch);
+                }
+            }
+        }
+        else
+        {
+            std::cout << "Fatal Error! ! ! add_Cell_boundary only for Cell !\n"
+                      << std::flush;
+            exit(-1);
+        }
+    };
+
+    // 仅仅对Face施加边界条件
+    void add_Face_boundary(std::string field_name)
+    {
+        int32_t field_id = fld_->field_id(field_name);
+        const FieldDescriptor &desc = fld_->descriptor(field_id);
+        // 未来可以用于分辨Cell Face Edge
+
+        if (desc.location == StaggerLocation::FaceXi ||
+            desc.location == StaggerLocation::FaceEt ||
+            desc.location == StaggerLocation::FaceZe)
+        {
+            for (auto &patch : phy_patterns_[desc.location].regions)
+            {
+                const int ib = patch.this_block;
+                FieldBlock &U = fld_->field(field_id, ib); // 该face上的 U
+
+                // 默认给Face使用简单的拷贝边界
+                apply_face_copy(U, patch);
+            }
+        }
+        else
+        {
+            std::cout << "Fatal Error! ! ! add_Face_boundary only for Face xi eta zeta !\n"
+                      << std::flush;
+            exit(-1);
+        }
+    };
+
+    // 针对“派生量”的轻量策略，主要用于B_cell
+    void add_derived_Cell_boundary(std::string field_name)
+    {
+        int32_t field_id = fld_->field_id(field_name);
+        const FieldDescriptor &desc = fld_->descriptor(field_id);
+        // 可用于分辨Cell Face Edge
+
+        if (desc.location == StaggerLocation::Cell && field_name == "B_cell")
+        {
+            // 遍历所有物理边界 patch
+            for (auto &patch : phy_patterns_[desc.location].regions)
+            {
+                int ib = patch.this_block;
+                FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
+                if (patch.bc_name == "Solid_Surface")
+                    apply_derived_cell_wall(U, patch);
+                else if (patch.bc_name == "Pole")
+                    apply_cell_pole(U, patch);
+                else
+                    apply_cell_copy(U, patch);
+            }
+        }
+        else
+        {
+            std::cout << "Error! ! ! add_derived_Cell_boundary is only for Cell and only for B_cell now! !\n"
+                      << std::flush;
+            exit(-1);
+        }
+    };
+
+    void add_Cell_boundary(std::vector<std::string> field_name_set)
+    {
+        for (auto fieldname : field_name_set)
+            add_Cell_boundary(fieldname);
+    }
+
+    void add_Face_boundary(std::vector<std::string> field_name_set)
+    {
+        for (auto fieldname : field_name_set)
+            add_Face_boundary(fieldname);
+    }
+    //===================================================================================
+
 private:
+    //===================================================================================
+    // Physical Pattern Data
     struct PhysicalRegion
     {
         //--------------------------------------------------------------------------
@@ -223,91 +362,39 @@ private:
             std::cout << "***********Finish the Physical Pattern building Process! !************\n\n"
                       << std::flush;
     }
+    //===================================================================================
 
-public:
-    void add_boundary(std::string field_name)
-    {
-        int32_t field_id = fld_->field_id(field_name);
-        const FieldDescriptor &desc = fld_->descriptor(field_id);
-        // 未来可以用于分辨Cell Face Edge
-
-        if (desc.location == StaggerLocation::Cell)
-            // 遍历所有物理边界 patch
-            for (auto &patch : phy_patterns_[desc.location].regions)
-            {
-                apply_cell_patch_U(patch, field_id);
-            }
-        else if (desc.location == StaggerLocation::FaceXi ||
-                 desc.location == StaggerLocation::FaceEt ||
-                 desc.location == StaggerLocation::FaceZe)
-        {
-            for (auto &patch : phy_patterns_[desc.location].regions)
-                apply_face_patch_B(patch, field_id, desc.location);
-        }
-    };
-
-    void add_boundary(std::vector<std::string> field_name_set)
-    {
-        for (auto fieldname : field_name_set)
-            add_boundary(fieldname);
-    }
-
-    void cell_copy_boundary(std::string field_name)
-    {
-        int32_t field_id = fld_->field_id(field_name);
-        const FieldDescriptor &desc = fld_->descriptor(field_id);
-        // 未来可以用于分辨Cell Face Edge
-
-        if (desc.location == StaggerLocation::Cell)
-            // 遍历所有物理边界 patch
-            for (auto &patch : phy_patterns_[desc.location].regions)
-            {
-                int ib = patch.this_block;
-                FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
-                if (patch.bc_name == "Pole")
-                    apply_cell_pole(U, patch);
-                // else if (patch.bc_name == "Solid_Surface")
-                //     apply_cell_wall_B(U, patch);
-                else
-                    apply_cell_copy(U, patch);
-            }
-    }
-
-    // 初始化，把需要用到的指针和 U_ 的 fid 记起来
-    void SetUp(Grid *grd, Field *fld, TOPO::Topology *topo, Param *par)
-    {
-        grd_ = grd;
-        fld_ = fld;
-        topo_ = topo;
-        par_ = par;
-
-        calc_farfield_data();
-
-        build_boundary_pattern();
-    }
-
-private:
+    //===================================================================================
+    // Data Tools
     Grid *grd_ = nullptr;
     Field *fld_ = nullptr;
     TOPO::Topology *topo_ = nullptr;
     Param *par_ = nullptr;
+    //===================================================================================
 
-    // 一个 patch 代表某块上的一个物理边界片段
-    void apply_cell_patch_U(PhysicalRegion &patch, int32_t field_id);
-
-    // 一个 patch 代表某块上的一个物理边界片段
-    void apply_face_patch_B(PhysicalRegion &patch, int32_t field_id, StaggerLocation location);
-
+    //===================================================================================
+    // Actual Boundary Conditions
+    //-------------------------------------------------------------------------
+    // Cell
+    //-------------------------------------------------------------------------
     // 针对不同边界类型做分发（根据 bc_name）
     void apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalRegion &patch);
     void apply_cell_farfield(FieldBlock &U, PhysicalRegion &patch);
     void apply_cell_copy(FieldBlock &U, PhysicalRegion &patch);
     void apply_cell_pole(FieldBlock &U, PhysicalRegion &patch);
 
-    void apply_cell_wall_B(FieldBlock &U, PhysicalRegion &patch);
+    // B_cell是导出量derived，壁面需要特殊处理
+    void apply_derived_cell_wall(FieldBlock &U, PhysicalRegion &patch);
 
+    //-------------------------------------------------------------------------
+    // Face
+    //-------------------------------------------------------------------------
+    // 针对Face暂时采用拷贝边界
     void apply_face_copy(FieldBlock &U, PhysicalRegion &patch);
+    //===================================================================================
 
+    //===================================================================================
+    // 数据初始化 通用无量纲数据
     void calc_farfield_data()
     {
         List<double> temp;
@@ -367,7 +454,7 @@ private:
     int ngg;
     double Velocity_ref, numdensity_ref, T_ref, rho_ref, p_ref, M_A, c_A, gamma_, inver_MA2;
     double farfield_u, farfield_T, farfield_rho, farfield_v, farfield_w, farfield_p, farfield_bx, farfield_by, farfield_bz;
-
+    //===================================================================================
 public:
     MHD_Boundary() {};
     ~MHD_Boundary() = default;

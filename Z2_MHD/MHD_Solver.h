@@ -59,27 +59,8 @@ public:
 
     void Advance()
     {
-        std::string U_string = "U_";
-        std::string Bcell_string = "B_cell";
-        // 0. halo + 物理边界 + 计算Bcell + PV_
-        {
-            // 计算更新B_cell
-            calc_Bcell();
-
-            // 传递更新虚网格的主控变量 U_ B_xi eta zeta
-            bound_.add_boundary(Solver_Name_);
-            for (auto &fld_name : Solver_Name_)
-            {
-                halo_->data_trans(fld_name);
-            }
-            halo_->data_trans_2DCorner(U_string);
-            halo_->data_trans_3DCorner(U_string);
-
-            // 计算原始变量
-            calc_PV();
-
-            copy_field();
-        }
+        // 0. Preparation
+        PrepareStep();
 
         while (true)
         {
@@ -93,25 +74,8 @@ public:
             // 3. 计算残差
             calc_Residual();
 
-            // 4. halo + 物理边界+ 计算Bcell + PV_
-            {
-                // 计算更新B_cell
-                calc_Bcell();
-
-                // 传递更新虚网格的主控变量 U_ B_xi eta zeta
-                bound_.add_boundary(Solver_Name_);
-                for (auto &fld_name : Solver_Name_)
-                {
-                    halo_->data_trans(fld_name);
-                }
-                halo_->data_trans_2DCorner(U_string);
-                halo_->data_trans_3DCorner(U_string);
-
-                // 计算原始变量
-                calc_PV();
-                calc_divB();
-                copy_field();
-            }
+            // 4. Preparation
+            PrepareStep();
 
             // 5. 更新控制
             control_.Update();
@@ -156,6 +120,40 @@ private:
     void inv_induce();
 
     void Reconstruction(double *metric, int32_t direction, FieldBlock &PV, FieldBlock &U, FieldBlock &B_cell, double B_jac_nabla, int iblock, int index_i, int index_j, int index_k, double *out_flux);
+
+    void PrepareStep()
+    {
+        // A) Face 主量的物理边界 + halo
+        std::vector<std::string> face_name = {"B_xi", "B_eta", "B_zeta"};
+        bound_.add_Face_boundary(face_name);
+        halo_->data_trans(face_name[0]);
+        halo_->data_trans(face_name[1]);
+        halo_->data_trans(face_name[2]);
+
+        // B) 只计算 inner （计算域）网格的派生量 B_cell
+        calc_Bcell();
+
+        // C) B_cell 的“派生边界策略”先用最简单 copy + halo (暂时不用角区通信)
+        std::string Bcell_string = "B_cell";
+        bound_.add_derived_Cell_boundary(Bcell_string);
+        halo_->data_trans(Bcell_string);
+        // halo_->data_trans_2DCorner(Bcell_string);
+        // halo_->data_trans_3DCorner(Bcell_string);
+
+        // D) U_ 的物理边界（此时可安全用 B_cell） + halo (暂时不用角区通信)
+        std::string U_string = "U_";
+        bound_.add_Cell_boundary(U_string);
+        halo_->data_trans(U_string);
+        // halo_->data_trans_2DCorner(U_string);
+        // halo_->data_trans_3DCorner(U_string);
+
+        // E) 原始量 + divB
+        calc_PV();
+        calc_divB();
+
+        // F) 复制物理场，用于残差计算
+        copy_field();
+    }
 
     struct Double3
     {
@@ -382,11 +380,6 @@ private:
                         Bcell(i, j, k, 2) = Bz_tot;
                     }
         }
-        std::string Bcell_string = "B_cell";
-        bound_.cell_copy_boundary(Bcell_string);
-        halo_->data_trans(Bcell_string);
-        halo_->data_trans_2DCorner(Bcell_string);
-        halo_->data_trans_3DCorner(Bcell_string);
     }
 
     void calc_divB()

@@ -58,7 +58,7 @@ void MHDSolver::time_advance()
     inv_fluid();
 
     std::vector<std::string> Electric_Face = {"E_face_xi", "E_face_eta", "E_face_zeta"};
-    bound_.add_boundary(Electric_Face);
+    bound_.add_Face_boundary(Electric_Face);
     halo_->data_trans(Electric_Face[0]);
     halo_->data_trans(Electric_Face[1]);
     halo_->data_trans(Electric_Face[2]);
