@@ -46,9 +46,9 @@ void MHDSolver::compute_timestep()
                         v = U(i, j, k, 2) / rho;
                         w = U(i, j, k, 3) / rho;
 
-                        Bx = Bcell(i, j, k, 0) + U(i, j, k, 5);
-                        By = Bcell(i, j, k, 1) + U(i, j, k, 6);
-                        Bz = Bcell(i, j, k, 2) + U(i, j, k, 7);
+                        Bx = Bcell(i, j, k, 0);
+                        By = Bcell(i, j, k, 1);
+                        Bz = Bcell(i, j, k, 2);
                         B2 = Bx * Bx + By * By + Bz * Bz;
 
                         p = PV(i, j, k, 3);
