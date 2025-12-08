@@ -376,7 +376,7 @@ private:
                         const double Bz_tot_old = Bcell(i, j, k, 2);
                         const double Delta_Eb = 0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) - 0.5 * inver_MA2 * (Bx_tot_old * Bx_tot_old + By_tot_old * By_tot_old + Bz_tot_old * Bz_tot_old);
 
-                        U(i, j, k, 4) += Delta_Eb;
+                        // U(i, j, k, 4) += Delta_Eb;
                         Bcell(i, j, k, 0) = Bx_tot;
                         Bcell(i, j, k, 1) = By_tot;
                         Bcell(i, j, k, 2) = Bz_tot;
