@@ -97,7 +97,7 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalReg
         face = &fld_->field("JDze", patch.this_block);
 
     // 小的压力下限，只防止浮点抖动出负压，不去“硬改物理”
-    const double p_floor = 1e-12;
+    const double p_floor = 1e-8 * farfield_p;
 
     double p0, rho0, Bx, By, Bz, Eb, kin;
     // double B_add_x = fld_->par->GetDou("B_add_x");

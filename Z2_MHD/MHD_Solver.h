@@ -243,50 +243,50 @@ private:
                         double p = (gamma_ - 1.0) * (E - kin - 0.5 * B2 * inver_MA2);
                         const double p_floor = 1e-8;
 
-                        // if (p < p_floor)
-                        // {
-                        //     // 希望：保持 E、B 不变，把一部分动能变成内能，使 p >= p_floor
+                        if (p < p_floor)
+                        {
+                            // 希望：保持 E、B 不变，把一部分动能变成内能，使 p >= p_floor
 
-                        //     // 目标内能对应的 e_floor
-                        //     double e_floor = p_floor / (gamma_ - 1.0);
+                            // 目标内能对应的 e_floor
+                            double e_floor = p_floor / (gamma_ - 1.0);
 
-                        //     // 对应的目标动能：E = K' + E_mag + e_floor
-                        //     double K_target = E - E_mag - e_floor;
+                            // 对应的目标动能：E = K' + E_mag + e_floor
+                            double K_target = E - E_mag - e_floor;
 
-                        //     if (K_target < 0.0)
-                        //     {
-                        //         // 能量不够支撑这么大的内能，只能把所有非磁能都变成内能
-                        //         K_target = 0.0;
-                        //         e_floor = E - E_mag;
-                        //         p = (gamma_ - 1.0) * e_floor;
-                        //     }
-                        //     else
-                        //     {
-                        //         // 正常情况：达到指定的 floor
-                        //         p = p_floor;
-                        //     }
+                            if (K_target < 0.0)
+                            {
+                                // 能量不够支撑这么大的内能，只能把所有非磁能都变成内能
+                                K_target = 0.0;
+                                e_floor = E - E_mag;
+                                p = (gamma_ - 1.0) * e_floor;
+                            }
+                            else
+                            {
+                                // 正常情况：达到指定的 floor
+                                p = p_floor;
+                            }
 
-                        //     if (kin > 0.0)
-                        //     {
-                        //         // 按 K' = beta^2 * K 缩放速度，从动能里挪出一部分作为内能
-                        //         double beta = sqrt(K_target / kin);
+                            if (kin > 0.0)
+                            {
+                                // 按 K' = beta^2 * K 缩放速度，从动能里挪出一部分作为内能
+                                double beta = sqrt(K_target / kin);
 
-                        //         u *= beta;
-                        //         v *= beta;
-                        //         w *= beta;
+                                u *= beta;
+                                v *= beta;
+                                w *= beta;
 
-                        //         PV(i, j, k, 0) = u;
-                        //         PV(i, j, k, 1) = v;
-                        //         PV(i, j, k, 2) = w;
+                                PV(i, j, k, 0) = u;
+                                PV(i, j, k, 1) = v;
+                                PV(i, j, k, 2) = w;
 
-                        //         U(i, j, k, 1) = rho * u;
-                        //         U(i, j, k, 2) = rho * v;
-                        //         U(i, j, k, 3) = rho * w;
-                        //     }
+                                U(i, j, k, 1) = rho * u;
+                                U(i, j, k, 2) = rho * v;
+                                U(i, j, k, 3) = rho * w;
+                            }
 
-                        //     // 注意：E 不变，保持总能量守恒
-                        //     // U(i, j, k, 4) = E;  // 不需要改
-                        // }
+                            // 注意：E 不变，保持总能量守恒
+                            // U(i, j, k, 4) = E;  // 不需要改
+                        }
                         PV(i, j, k, 3) = p;
                         // PV(i, j, k, 3) = (E - kin - 0.5 * B2 * inver_MA2) * (gamma_ - 1.0);
                     }
