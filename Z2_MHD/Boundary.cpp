@@ -16,7 +16,7 @@ void MHD_Boundary::apply_cell_copy(FieldBlock &U, PhysicalRegion &patch)
             for (int32_t kk = lo.k; kk < hi.k; kk++)
             {
                 // ii jj kk在边界面上循环，属于计算网格范围
-                for (int32_t ng = 1; ng <= ngg; ng++)
+                for (int32_t ng = 1; ng <= ngh; ng++)
                 {
                     // i j k在虚网格上循环
                     i = ii + ng * cyc.i;
@@ -44,7 +44,7 @@ void MHD_Boundary::apply_cell_farfield(FieldBlock &U, PhysicalRegion &patch)
             for (int32_t kk = lo.k; kk < hi.k; kk++)
             {
                 // ii jj kk在边界面上循环，属于计算网格范围
-                for (int32_t ng = 1; ng <= ngg; ng++)
+                for (int32_t ng = 1; ng <= ngh; ng++)
                 {
                     // i j k在虚网格上循环
                     i = ii + ng * cyc.i;
@@ -219,7 +219,7 @@ void MHD_Boundary::apply_face_copy(FieldBlock &U, PhysicalRegion &patch)
             for (int32_t kk = lo.k; kk < hi.k; kk++)
             {
                 // ii jj kk在边界面上循环，属于计算网格范围
-                for (int32_t ng = 1; ng <= ngg; ng++)
+                for (int32_t ng = 1; ng <= ngh; ng++)
                 {
                     // i j k在虚网格上循环
                     i = ii + ng * cyc.i;
@@ -252,7 +252,7 @@ void MHD_Boundary::apply_derived_cell_wall(FieldBlock &U, PhysicalRegion &patch)
             for (int32_t kk = lo.k; kk < hi.k; kk++)
             {
                 // ii jj kk在边界面上循环，属于计算网格范围
-                for (int32_t ng = 1; ng <= ngg; ng++)
+                for (int32_t ng = 1; ng <= ngh; ng++)
                 {
                     // i j k在虚网格上循环
                     i = ii + ng * cyc.i;
