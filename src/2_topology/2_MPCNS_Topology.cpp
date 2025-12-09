@@ -1,5 +1,8 @@
 #include "2_topology/2_MPCNS_Topology.h"
 #include "0_basic/MPI_WRAPPER.h"
+#include <unordered_map>
+#include <algorithm>
+#include <limits>
 
 namespace TOPO
 {
@@ -29,6 +32,46 @@ namespace TOPO
                 topo.physical_patches.push_back(p);
             }
         }
+
+        // 构建完以后按优先级排序
+        {
+            auto Priority = grid.par->GetInt_List("Boundary_Priority");
+
+            // name -> priority_value
+            std::unordered_map<std::string, int32_t> pri;
+            pri.reserve(Priority.data.size());
+            for (const auto &kv : Priority.data)
+                pri.emplace(kv.first, kv.second);
+
+            // 不在 Priority 里的边界给一个很小的默认值
+            auto get_pri = [&](const std::string &name) -> int32_t
+            {
+                auto it = pri.find(name);
+                if (it != pri.end())
+                    return it->second;
+                return std::numeric_limits<int32_t>::min();
+            };
+
+            // “把高优先级往后挪”
+            // 即：priority 越大越靠后（最后应用/覆盖）
+            std::stable_sort(topo.physical_patches.begin(), topo.physical_patches.end(),
+                             [&](const PhysicalPatch &a, const PhysicalPatch &b)
+                             {
+                                 int32_t pa = get_pri(a.bc_name);
+                                 int32_t pb = get_pri(b.bc_name);
+
+                                 if (pa != pb)
+                                     return pa < pb; // 小的在前，大的在后
+
+                                 // 可选：保证排序确定性
+                                 if (a.this_block != b.this_block)
+                                     return a.this_block < b.this_block;
+                                 if (a.direction != b.direction)
+                                     return a.direction < b.direction;
+                                 return a.bc_id < b.bc_id;
+                             });
+        }
+
         //=======================================================================
 
         //=======================================================================
