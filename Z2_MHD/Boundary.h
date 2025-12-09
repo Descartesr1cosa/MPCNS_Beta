@@ -449,10 +449,10 @@ private:
         farfield_by = By;
         farfield_bz = Bz;
 
-        ngg = fld_->grd->ngg;
+        // ngg = fld_->grd->ngg;
     };
 
-    int ngg;
+    // int ngg;
     double Velocity_ref, numdensity_ref, T_ref, rho_ref, p_ref, M_A, c_A, gamma_, inver_MA2;
     double farfield_u, farfield_T, farfield_rho, farfield_v, farfield_w, farfield_p, farfield_bx, farfield_by, farfield_bz;
     //===================================================================================
