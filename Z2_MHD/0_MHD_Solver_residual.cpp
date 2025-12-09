@@ -28,7 +28,7 @@ void MHDSolver::calc_Residual()
                         if (std::isnan(U_calc(i, j, k, l)))
                         {
                             std::cout << "NAN Appear ! ! !   Myid=\t"
-                                      << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "\n";
+                                      << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "For componet " << l << "\n";
                             exit(-1);
                         }
                         temp = U_calc(i, j, k, l) - field_U(i, j, k, l);
@@ -51,7 +51,7 @@ void MHDSolver::calc_Residual()
                     if (std::isnan(U_calc(i, j, k, 0)))
                     {
                         std::cout << "NAN Appear ! ! !   Myid=\t"
-                                  << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "\n";
+                                  << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "For componet B_xi" << "\n";
                         exit(-1);
                     }
                     temp = U_calc(i, j, k, 0) - field_U(i, j, k, 0);
@@ -72,7 +72,7 @@ void MHDSolver::calc_Residual()
                     if (std::isnan(U_calc(i, j, k, 0)))
                     {
                         std::cout << "NAN Appear ! ! !   Myid=\t"
-                                  << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "\n";
+                                  << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "For componet B_eta" << "\n";
                         exit(-1);
                     }
                     temp = U_calc(i, j, k, 0) - field_U(i, j, k, 0);
@@ -93,7 +93,7 @@ void MHDSolver::calc_Residual()
                     if (std::isnan(U_calc(i, j, k, 0)))
                     {
                         std::cout << "NAN Appear ! ! !   Myid=\t"
-                                  << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "\n";
+                                  << par_->GetInt("myid") << "\tn, i, j, k=\t" << iblock << "\t" << i << "\t" << j << "\t" << k << "For componet B_zeta" << "\n";
                         exit(-1);
                     }
                     temp = U_calc(i, j, k, 0) - field_U(i, j, k, 0);
