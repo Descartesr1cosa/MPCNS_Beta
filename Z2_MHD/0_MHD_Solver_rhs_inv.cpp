@@ -354,7 +354,7 @@ void MHDSolver::inv_induce()
                         E.vector[1] = 0.25 * (E_face_eta(i, j, k, 1) + E_face_eta(i, j, k - 1, 1) + E_face_zeta(i, j, k, 1) + E_face_zeta(i, j - 1, k, 1));
                         E.vector[2] = 0.25 * (E_face_eta(i, j, k, 2) + E_face_eta(i, j, k - 1, 2) + E_face_zeta(i, j, k, 2) + E_face_zeta(i, j - 1, k, 2));
 
-                                               dr = {x(i + 1, j, k) - x(i, j, k),
+                        dr = {x(i + 1, j, k) - x(i, j, k),
                               y(i + 1, j, k) - y(i, j, k),
                               z(i + 1, j, k) - z(i, j, k)};
                         Exi(i, j, k, 0) = E * dr;
