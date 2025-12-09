@@ -475,6 +475,9 @@ void MHDSolver::inv_induce()
     //                 }
     //     }
     // }
+    bound_.add_Edge_pole_boundary("E_xi");
+    // bound_.add_Edge_pole_boundary("E_eta");
+    // bound_.add_Edge_pole_boundary("E_zeta");
 
     // 计算RHS_xi
     for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)

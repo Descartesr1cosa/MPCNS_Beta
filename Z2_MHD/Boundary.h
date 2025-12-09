@@ -141,6 +141,79 @@ public:
     }
     //===================================================================================
 
+    void add_Edge_pole_boundary(std::string field_name)
+    {
+        int32_t field_id = fld_->field_id(field_name);
+        for (auto &top : topo_->physical_patches)
+        {
+            if (top.bc_name == "Pole")
+            {
+                const int ib = top.this_block;
+                FieldBlock &U = fld_->field(field_id, ib); // 该face上的 U
+                if (field_name == "E_zeta")
+                {
+                    continue; // 一定为0
+                }
+                else if (field_name == "E_xi" && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
+                {
+                    continue;
+                }
+                else if (field_name == "E_xi" && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
+                {
+                    double temp, count;
+                    for (int i = top.this_box_node.lo.i; i < top.this_box_node.hi.i - 1; i++)
+                        for (int j = top.this_box_node.lo.j; j < top.this_box_node.hi.j; j++)
+                        {
+                            temp = 0.0;
+                            count = 0.0;
+
+                            // Sum
+                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
+                            {
+                                temp += U(i, j, k, 0);
+                                count += 1.0;
+                            }
+
+                            // Average
+                            temp /= count;
+
+                            // Unified
+                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
+                                U(i, j, k, 0) = temp;
+                        }
+                }
+                else if (field_name == "E_eta" && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
+                {
+                    double temp, count;
+                    for (int i = top.this_box_node.lo.i; i < top.this_box_node.hi.i; i++)
+                        for (int j = top.this_box_node.lo.j; j < top.this_box_node.hi.j - 1; j++)
+                        {
+                            temp = 0.0;
+                            count = 0.0;
+
+                            // Sum
+                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
+                            {
+                                temp += U(i, j, k, 0);
+                                count += 1.0;
+                            }
+
+                            // Average
+                            temp /= count;
+
+                            // Unified
+                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
+                                U(i, j, k, 0) = temp;
+                        }
+                }
+                else if (field_name == "E_eta" && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
+                {
+                    continue;
+                }
+            }
+        }
+    }
+
 private:
     //===================================================================================
     // Physical Pattern Data
