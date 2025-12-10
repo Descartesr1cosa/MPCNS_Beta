@@ -8,6 +8,11 @@ void Field::build_geometry()
     register_field(FieldDescriptor{"JDet", StaggerLocation::FaceEt, 3, 0});
     register_field(FieldDescriptor{"JDze", StaggerLocation::FaceZe, 3, 0});
 
+    // --- NEW: covariant basis vectors at cell centers ---
+    register_field(FieldDescriptor{"a_xi", StaggerLocation::Cell, 3, 0});
+    register_field(FieldDescriptor{"a_eta", StaggerLocation::Cell, 3, 0});
+    register_field(FieldDescriptor{"a_zeta", StaggerLocation::Cell, 3, 0});
+
     auto dot = [&](const std::array<double, 3> &a, const std::array<double, 3> &b)
     {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -234,6 +239,81 @@ void Field::build_geometry()
                         V += dot(Af_zp, minus(xf_zp, xc));
 
                         Jac(i, j, k, 0) = V / 3.0;
+                    }
+        }
+    }
+
+    {
+        // Calc_ covariant basis vectors a_xi, a_eta, a_zeta at cell centers
+        auto &axi_ = field("a_xi");
+        auto &aeta_ = field("a_eta");
+        auto &azeta_ = field("a_zeta");
+
+        for (int ib = 0; ib < grd->nblock; ++ib)
+        {
+            auto &axi = axi_[ib];
+            auto &aeta = aeta_[ib];
+            auto &azeta = azeta_[ib];
+
+            auto &x = grd->grids(ib).x;
+            auto &y = grd->grids(ib).y;
+            auto &z = grd->grids(ib).z;
+
+            Int3 lo = axi.inner_lo();
+            Int3 hi = axi.inner_hi();
+
+            auto node = [&](int i, int j, int k) -> std::array<double, 3>
+            {
+                return {x(i, j, k), y(i, j, k), z(i, j, k)};
+            };
+
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        // 8 corner nodes of cell (i,j,k)
+                        auto r000 = node(i, j, k);
+                        auto r100 = node(i + 1, j, k);
+                        auto r010 = node(i, j + 1, k);
+                        auto r110 = node(i + 1, j + 1, k);
+
+                        auto r001 = node(i, j, k + 1);
+                        auto r101 = node(i + 1, j, k + 1);
+                        auto r011 = node(i, j + 1, k + 1);
+                        auto r111 = node(i + 1, j + 1, k + 1);
+
+                        // ---- a_xi: average of 4 xi-directed edges ----
+                        auto ex0 = minus(r100, r000);
+                        auto ex1 = minus(r110, r010);
+                        auto ex2 = minus(r101, r001);
+                        auto ex3 = minus(r111, r011);
+                        auto exs = plus(plus(ex0, ex1), plus(ex2, ex3));
+
+                        axi(i, j, k, 0) = 0.25 * exs[0];
+                        axi(i, j, k, 1) = 0.25 * exs[1];
+                        axi(i, j, k, 2) = 0.25 * exs[2];
+
+                        // ---- a_eta: average of 4 eta-directed edges ----
+                        auto ey0 = minus(r010, r000);
+                        auto ey1 = minus(r110, r100);
+                        auto ey2 = minus(r011, r001);
+                        auto ey3 = minus(r111, r101);
+                        auto eys = plus(plus(ey0, ey1), plus(ey2, ey3));
+
+                        aeta(i, j, k, 0) = 0.25 * eys[0];
+                        aeta(i, j, k, 1) = 0.25 * eys[1];
+                        aeta(i, j, k, 2) = 0.25 * eys[2];
+
+                        // ---- a_zeta: average of 4 zeta-directed edges ----
+                        auto ez0 = minus(r001, r000);
+                        auto ez1 = minus(r101, r100);
+                        auto ez2 = minus(r011, r010);
+                        auto ez3 = minus(r111, r110);
+                        auto ezs = plus(plus(ez0, ez1), plus(ez2, ez3));
+
+                        azeta(i, j, k, 0) = 0.25 * ezs[0];
+                        azeta(i, j, k, 1) = 0.25 * ezs[1];
+                        azeta(i, j, k, 2) = 0.25 * ezs[2];
                     }
         }
     }
