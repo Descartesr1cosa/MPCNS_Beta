@@ -229,10 +229,10 @@ void MHDSolver::Reconstruction(double *metric, int32_t direction,
         double Bz = B_cell(ic, jc, kc, 2); // including B_add
 
         double inner_product = Bx * metric[0] + By * metric[1] + Bz * metric[2];
-        double inner_product_add = B_add_x * metric[0] + B_add_y * metric[1] + B_add_z * metric[2];
+        // double inner_product_add = B_add_x * metric[0] + B_add_y * metric[1] + B_add_z * metric[2];
         double inver_norm2 = 1.0 / (metric[0] * metric[0] + metric[1] * metric[1] + metric[2] * metric[2] + 1E-20);
 
-        double B_jac_total = B_jac_nabla + inner_product_add; // 法向通量仅仅为induced部分
+        double B_jac_total = B_jac_nabla; // + inner_product_add; // 法向通量仅仅为induced部分
         // 修正Bx By Bz保持法向分量的通量与感应CT值一致
         // double dBx, dBy, dBz;
         // dBx = (inner_product - B_jac_total) * inver_norm2 * metric[0];
@@ -315,6 +315,89 @@ void MHDSolver::Reconstruction(double *metric, int32_t direction,
     for (int m = 0; m < 8; ++m)
         out_flux[m] = 0.5 * (FL[m] + FR[m]) - 0.5 * radius_max * (UR[m] - UL[m]);
 
+    // if (par_->GetInt("myid") == 0)
+    // {
+    //     auto cross = [&](double *a, double *b, double *c)
+    //     {
+    //         c[0] = a[1] * b[2] - a[2] * b[1];
+    //         c[1] = a[2] * b[0] - a[0] * b[2];
+    //         c[2] = a[0] * b[1] - a[1] * b[0];
+    //     };
+
+    //     auto dot = [&](double *a, double *b) -> double
+    //     {
+    //         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    //     };
+    //     auto out = [&](double *a)
+    //     {
+    //         std::cout << a[0] << "\t" << a[1] << "\t" << a[2] << "\t|||\n";
+    //     };
+    //     auto out2 = [&](double *a, double *b)
+    //     {
+    //         std::cout << a[0] - b[0] << "\t" << a[1] - b[1] << "\t" << a[2] - b[2] << "\t|||\n";
+    //     };
+    // double Bx = B_cell(i, j, k, 0) - B_add_x; // including B_add
+    // double By = B_cell(i, j, k, 1) - B_add_y; // including B_add
+    // double Bz = B_cell(i, j, k, 2) - B_add_z; // including B_add
+
+    // double k1, k2, k3; // GCL 这里为Jac *k1, Jac *k2, Jac *k3
+    // k1 = metric[0];
+    // k2 = metric[1];
+    // k3 = metric[2];
+
+    // std::cout << k1 * Bx + k2 * By + k3 * Bz - B_jac_nabla << "\t" << i << "\t" << j << "\t" << k << "\n";
+
+    //     double uvw = k1 * PV(i, j, k, 0) + k2 * PV(i, j, k, 1) + k3 * PV(i, j, k, 2);
+
+    //     double inner_product = Bx * metric[0] + By * metric[1] + Bz * metric[2];
+    //     double inner_product_add = B_add_x * metric[0] + B_add_y * metric[1] + B_add_z * metric[2];
+
+    //     double u, v, w;
+    //     u = PV(i, j, k, 0);
+    //     v = PV(i, j, k, 1);
+    //     w = PV(i, j, k, 2);
+
+    //     double temp[3], E[3], KE[3];
+    //     E[0] = -(v * Bz - w * By);
+    //     E[1] = -(w * Bx - u * Bz);
+    //     E[2] = -(u * By - v * Bx);
+    //     cross(metric, E, KE);
+
+    //     temp[0] = uvw * Bx - inner_product_add * PV(i, j, k, 0);
+    //     temp[1] = uvw * By - inner_product_add * PV(i, j, k, 1);
+    //     temp[2] = uvw * Bz - inner_product_add * PV(i, j, k, 2);
+
+    //     // out2(KE, temp);
+    //     double KtimesKE[3];
+    //     cross(metric, KE, KtimesKE);
+    //     // std::cout << dot(metric, KE) << "\n";
+
+    //     double norm2 = -1.0 / (metric[0] * metric[0] + metric[1] * metric[1] + metric[2] * metric[2]);
+
+    //     KtimesKE[0] *= norm2;
+    //     KtimesKE[1] *= norm2;
+    //     KtimesKE[2] *= norm2;
+
+    //     double E_hope[3];
+    //     E_hope[0] = E[0] + dot(metric, E) * metric[0] * norm2;
+    //     E_hope[1] = E[1] + dot(metric, E) * metric[1] * norm2;
+    //     E_hope[2] = E[2] + dot(metric, E) * metric[2] * norm2;
+    //     // out(KtimesKE);
+
+    //     double temp_flux[3];
+    //     temp_flux[0] = norm2 * (metric[1] * temp[2] - metric[2] * temp[1]); // Averaged Electric in Face xi eta zeta
+    //     temp_flux[1] = norm2 * (metric[2] * temp[0] - metric[0] * temp[2]); // Averaged Electric in Face xi eta zeta
+    //     temp_flux[2] = norm2 * (metric[0] * temp[1] - metric[1] * temp[0]); // Averaged Electric in Face xi eta zeta
+    //     out2(KtimesKE, E_hope);
+
+    //     // std::cout << out_flux[5] << "\t" << out_flux[6] << "\t" << out_flux[7] << "\t|||\n";
+
+    //     // std::cout << inner_product << "\t" << inner_product_add << "\t" << (inner_product - inner_product_add) / inner_product << "\n"
+    //     //   << std::flush;
+    //     // std::cout
+    //     //     << out_flux[5] << "\t" << out_flux[6] << "\t" << out_flux[7] << "\t|||\t" << FR[5] << "\t" << FL[5] << "\t" << FR[6] << "\t" << FL[6] << "\t" << FR[7] << "\t" << FL[7] << "\n"
+    //     //     << std::flush;
+    // }
     // 对最后三个变量，B的通量进行旋转，获得face上的电场
     // E_tangetial  =  - K \times Flux / |K^2|     K=\nabla\xi \eta \zeta
     double Elec_flux[3] = {out_flux[5], out_flux[6], out_flux[7]};

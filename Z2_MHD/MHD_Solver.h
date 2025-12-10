@@ -8,6 +8,8 @@
 #include "Boundary.h"
 #include "Initial.h"
 
+#include <array>
+
 class MHDSolver
 {
 public:
@@ -84,7 +86,8 @@ public:
             // output_.output_plt_field(); // output_.output_plt_cell_field(output_.var_defaut_plt_name); // output_field();
             if (control_.if_stop)
             {
-                output_.output_field();
+                output_.output_plt_cell_field(output_.var_defaut_plt_name);
+                // output_.output_field();
                 break;
             }
         }
@@ -297,10 +300,23 @@ private:
     {
         const int nblock = fld_->num_blocks();
 
+        const double eps = 1e-300;
+        const double delta = 1e-6; // same spirit as your reference
+
+        auto dot = [&](const std::array<double, 3> &a, const std::array<double, 3> &b)
+        {
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        };
+        auto norm = [&](const std::array<double, 3> &a)
+        {
+            return std::sqrt(dot(a, a));
+        };
+
         for (int ib = 0; ib < nblock; ++ib)
         {
             auto &Bcell = fld_->field(fid_Bcell, ib);
             auto &U = fld_->field(fid_U, ib);
+
             auto &Bxi = fld_->field(fid_Bxi, ib);
             auto &Beta = fld_->field(fid_Beta, ib);
             auto &Bzeta = fld_->field(fid_Bzeta, ib);
@@ -310,7 +326,37 @@ private:
             auto &A_eta = fld_->field(fid_Eta, ib); // JDet
             auto &A_ze = fld_->field(fid_Zeta, ib); // JDze
 
-            // 这里用几何体积的 inner_lo/inner_hi 作为 cell 中心循环范围
+            auto &x = grd_->grids(ib).x;
+            auto &y = grd_->grids(ib).y;
+            auto &z = grd_->grids(ib).z;
+
+            auto &cx = grd_->grids(ib).dual_x;
+            auto &cy = grd_->grids(ib).dual_y;
+            auto &cz = grd_->grids(ib).dual_z;
+
+            // face centers (consistent with your Jac construction style)
+            auto xfc_xi = [&](int i, int j, int k) -> std::array<double, 3>
+            {
+                return {
+                    0.25 * (x(i, j, k) + x(i, j + 1, k) + x(i, j, k + 1) + x(i, j + 1, k + 1)),
+                    0.25 * (y(i, j, k) + y(i, j + 1, k) + y(i, j, k + 1) + y(i, j + 1, k + 1)),
+                    0.25 * (z(i, j, k) + z(i, j + 1, k) + z(i, j, k + 1) + z(i, j + 1, k + 1))};
+            };
+            auto xfc_eta = [&](int i, int j, int k) -> std::array<double, 3>
+            {
+                return {
+                    0.25 * (x(i, j, k) + x(i + 1, j, k) + x(i, j, k + 1) + x(i + 1, j, k + 1)),
+                    0.25 * (y(i, j, k) + y(i + 1, j, k) + y(i, j, k + 1) + y(i + 1, j, k + 1)),
+                    0.25 * (z(i, j, k) + z(i + 1, j, k) + z(i, j, k + 1) + z(i + 1, j, k + 1))};
+            };
+            auto xfc_zeta = [&](int i, int j, int k) -> std::array<double, 3>
+            {
+                return {
+                    0.25 * (x(i, j, k) + x(i + 1, j, k) + x(i, j + 1, k) + x(i + 1, j + 1, k)),
+                    0.25 * (y(i, j, k) + y(i + 1, j, k) + y(i, j + 1, k) + y(i + 1, j + 1, k)),
+                    0.25 * (z(i, j, k) + z(i + 1, j, k) + z(i, j + 1, k) + z(i + 1, j + 1, k))};
+            };
+
             Int3 lo = Jac.inner_lo();
             Int3 hi = Jac.inner_hi();
 
@@ -318,69 +364,246 @@ private:
                 for (int j = lo.j; j < hi.j; ++j)
                     for (int k = lo.k; k < hi.k; ++k)
                     {
-                        const double J = Jac(i, j, k, 0);
+                        // cell center
+                        std::array<double, 3> Xc = {
+                            cx(i + 1, j + 1, k + 1),
+                            cy(i + 1, j + 1, k + 1),
+                            cz(i + 1, j + 1, k + 1)};
 
-                        // ---- 2.1 cell 中心的对偶分量 B^ξ, B^η, B^ζ （face 值平均）----
+                        struct FaceEq
+                        {
+                            std::array<double, 3> n; // normalized S
+                            double phi;              // normalized Phi
+                            double w;                // weight
+                        };
+                        FaceEq eqs[6];
+                        int K = 0;
 
-                        const double Bxi_m = Bxi(i, j, k, 0);
-                        const double Bxi_p = Bxi(i + 1, j, k, 0);
-                        const double Beta_m = Beta(i, j, k, 0);
-                        const double Beta_p = Beta(i, j + 1, k, 0);
-                        const double Bze_m = Bzeta(i, j, k, 0);
-                        const double Bze_p = Bzeta(i, j, k + 1, 0);
+                        auto push = [&](const std::array<double, 3> &S,
+                                        double Phi,
+                                        const std::array<double, 3> &Xf)
+                        {
+                            double s_norm = norm(S) + eps;
+                            std::array<double, 3> nvec = {S[0] / s_norm, S[1] / s_norm, S[2] / s_norm};
+                            double phi_hat = Phi / s_norm;
 
-                        const double Bxi_c = 0.5 * (Bxi_m + Bxi_p);
-                        const double Beta_c = 0.5 * (Beta_m + Beta_p);
-                        const double Bzeta_c = 0.5 * (Bze_m + Bze_p);
+                            double dx = Xf[0] - Xc[0];
+                            double dy = Xf[1] - Xc[1];
+                            double dz = Xf[2] - Xc[2];
+                            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-                        // ---- 2.2 cell 中心的面积向量 Aξ, Aη, Aζ （JDxi/JDet/JDze 平均）----
+                            double w = 1.0 / std::sqrt(dist * dist + delta * delta);
 
-                        // Aξ 在 i 和 i+1 两个 xi-face 之间平均
-                        double Axi_c[3] = {
-                            0.5 * (A_xi(i, j, k, 0) + A_xi(i + 1, j, k, 0)),
-                            0.5 * (A_xi(i, j, k, 1) + A_xi(i + 1, j, k, 1)),
-                            0.5 * (A_xi(i, j, k, 2) + A_xi(i + 1, j, k, 2))};
+                            eqs[K++] = {nvec, phi_hat, w};
+                        };
 
-                        // Aη 在 j 和 j+1 两个 eta-face 之间平均
-                        double Aeta_c[3] = {
-                            0.5 * (A_eta(i, j, k, 0) + A_eta(i, j + 1, k, 0)),
-                            0.5 * (A_eta(i, j, k, 1) + A_eta(i, j + 1, k, 1)),
-                            0.5 * (A_eta(i, j, k, 2) + A_eta(i, j + 1, k, 2))};
+                        // ---------- xi- face (at i) ----------
+                        std::array<double, 3> S_xm = {
+                            -A_xi(i, j, k, 0),
+                            -A_xi(i, j, k, 1),
+                            -A_xi(i, j, k, 2)};
+                        double Phi_xm = -Bxi(i, j, k, 0);
+                        push(S_xm, Phi_xm, xfc_xi(i, j, k));
 
-                        // Aζ 在 k 和 k+1 两个 zeta-face 之间平均
-                        double Aze_c[3] = {
-                            0.5 * (A_ze(i, j, k, 0) + A_ze(i, j, k + 1, 0)),
-                            0.5 * (A_ze(i, j, k, 1) + A_ze(i, j, k + 1, 1)),
-                            0.5 * (A_ze(i, j, k, 2) + A_ze(i, j, k + 1, 2))};
+                        // ---------- xi+ face (at i+1) ----------
+                        std::array<double, 3> S_xp = {
+                            A_xi(i + 1, j, k, 0),
+                            A_xi(i + 1, j, k, 1),
+                            A_xi(i + 1, j, k, 2)};
+                        double Phi_xp = Bxi(i + 1, j, k, 0);
+                        push(S_xp, Phi_xp, xfc_xi(i + 1, j, k));
 
-                        // ---- 2.3 按 B = (1/J) [ Bξ Aξ + Bη Aη + Bζ Aζ ] 组装物理 B_ind ----
-                        double Bx_ind =
-                            (Bxi_c * Axi_c[0] + Beta_c * Aeta_c[0] + Bzeta_c * Aze_c[0]) / J;
+                        // ---------- eta- face (at j) ----------
+                        std::array<double, 3> S_em = {
+                            -A_eta(i, j, k, 0),
+                            -A_eta(i, j, k, 1),
+                            -A_eta(i, j, k, 2)};
+                        double Phi_em = -Beta(i, j, k, 0);
+                        push(S_em, Phi_em, xfc_eta(i, j, k));
 
-                        double By_ind =
-                            (Bxi_c * Axi_c[1] + Beta_c * Aeta_c[1] + Bzeta_c * Aze_c[1]) / J;
+                        // ---------- eta+ face (at j+1) ----------
+                        std::array<double, 3> S_ep = {
+                            A_eta(i, j + 1, k, 0),
+                            A_eta(i, j + 1, k, 1),
+                            A_eta(i, j + 1, k, 2)};
+                        double Phi_ep = Beta(i, j + 1, k, 0);
+                        push(S_ep, Phi_ep, xfc_eta(i, j + 1, k));
 
-                        double Bz_ind =
-                            (Bxi_c * Axi_c[2] + Beta_c * Aeta_c[2] + Bzeta_c * Aze_c[2]) / J;
+                        // ---------- zeta- face (at k) ----------
+                        std::array<double, 3> S_zm = {
+                            -A_ze(i, j, k, 0),
+                            -A_ze(i, j, k, 1),
+                            -A_ze(i, j, k, 2)};
+                        double Phi_zm = -Bzeta(i, j, k, 0);
+                        push(S_zm, Phi_zm, xfc_zeta(i, j, k));
 
-                        // ---- 2.4 加上背景场----
-                        const double Bx_tot = Bx_ind + B_add_x;
-                        const double By_tot = By_ind + B_add_y;
-                        const double Bz_tot = Bz_ind + B_add_z;
+                        // ---------- zeta+ face (at k+1) ----------
+                        std::array<double, 3> S_zp = {
+                            A_ze(i, j, k + 1, 0),
+                            A_ze(i, j, k + 1, 1),
+                            A_ze(i, j, k + 1, 2)};
+                        double Phi_zp = Bzeta(i, j, k + 1, 0);
+                        push(S_zp, Phi_zp, xfc_zeta(i, j, k + 1));
 
-                        //----- 2.5 修改磁场和磁能----
-                        const double Bx_tot_old = Bcell(i, j, k, 0);
-                        const double By_tot_old = Bcell(i, j, k, 1);
-                        const double Bz_tot_old = Bcell(i, j, k, 2);
-                        const double Delta_Eb = 0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) - 0.5 * inver_MA2 * (Bx_tot_old * Bx_tot_old + By_tot_old * By_tot_old + Bz_tot_old * Bz_tot_old);
+                        // ---------- build normal equations N = A^T W A, r = A^T W phi ----------
+                        double N00 = 0, N01 = 0, N02 = 0, N11 = 0, N12 = 0, N22 = 0;
+                        double rx = 0, ry = 0, rz = 0;
+
+                        for (int t = 0; t < K; ++t)
+                        {
+                            double w = eqs[t].w;
+                            const auto &n = eqs[t].n;
+                            double phi = eqs[t].phi;
+
+                            N00 += w * n[0] * n[0];
+                            N01 += w * n[0] * n[1];
+                            N02 += w * n[0] * n[2];
+                            N11 += w * n[1] * n[1];
+                            N12 += w * n[1] * n[2];
+                            N22 += w * n[2] * n[2];
+
+                            rx += w * phi * n[0];
+                            ry += w * phi * n[1];
+                            rz += w * phi * n[2];
+                        }
+
+                        auto det3 = [&](double a, double b, double c, double d, double e, double f)
+                        {
+                            // | a b c |
+                            // | b d e |
+                            // | c e f |
+                            return a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d);
+                        };
+
+                        double det = det3(N00, N01, N02, N11, N12, N22);
+                        double reg = 1e-14 * (N00 + N11 + N22);
+
+                        if (std::abs(det) < reg)
+                        {
+                            N00 += reg;
+                            N11 += reg;
+                            N22 += reg;
+                            det = det3(N00, N01, N02, N11, N12, N22);
+                        }
+
+                        // cofactors of symmetric matrix
+                        double C00 = (N11 * N22 - N12 * N12);
+                        double C01 = (N02 * N12 - N01 * N22);
+                        double C02 = (N01 * N12 - N02 * N11);
+                        double C11 = (N00 * N22 - N02 * N02);
+                        double C12 = (N01 * N02 - N00 * N12);
+                        double C22 = (N00 * N11 - N01 * N01);
+
+                        double inv = 1.0 / det;
+
+                        double Bx_ind = inv * (C00 * rx + C01 * ry + C02 * rz);
+                        double By_ind = inv * (C01 * rx + C11 * ry + C12 * rz);
+                        double Bz_ind = inv * (C02 * rx + C12 * ry + C22 * rz);
+
+                        // background field if you want it
+                        const double Bx_tot = Bx_ind; // + B_add_x;
+                        const double By_tot = By_ind; // + B_add_y;
+                        const double Bz_tot = Bz_ind; // + B_add_z;
+
+                        // energy consistency (keep your existing style)
+                        const double Bx_old = Bcell(i, j, k, 0);
+                        const double By_old = Bcell(i, j, k, 1);
+                        const double Bz_old = Bcell(i, j, k, 2);
+
+                        const double Delta_Eb =
+                            0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) -
+                            0.5 * inver_MA2 * (Bx_old * Bx_old + By_old * By_old + Bz_old * Bz_old);
 
                         // U(i, j, k, 4) += Delta_Eb;
+
                         Bcell(i, j, k, 0) = Bx_tot;
                         Bcell(i, j, k, 1) = By_tot;
                         Bcell(i, j, k, 2) = Bz_tot;
                     }
         }
     }
+
+    // void calc_Bcell()
+    // {
+    //     const int nblock = fld_->num_blocks();
+
+    //     for (int ib = 0; ib < nblock; ++ib)
+    //     {
+    //         auto &Bcell = fld_->field(fid_Bcell, ib);
+    //         auto &U = fld_->field(fid_U, ib);
+    //         auto &Bxi = fld_->field(fid_Bxi, ib);
+    //         auto &Beta = fld_->field(fid_Beta, ib);
+    //         auto &Bzeta = fld_->field(fid_Bzeta, ib);
+
+    //         auto &Jac = fld_->field(fid_Jac, ib);
+
+    //         auto &axi = fld_->field("a_xi", ib);
+    //         auto &aeta = fld_->field("a_eta", ib);
+    //         auto &aze = fld_->field("a_zeta", ib);
+    //         // 这里用几何体积的 inner_lo/inner_hi 作为 cell 中心循环范围
+    //         Int3 lo = Jac.inner_lo();
+    //         Int3 hi = Jac.inner_hi();
+
+    //         for (int i = lo.i; i < hi.i; ++i)
+    //             for (int j = lo.j; j < hi.j; ++j)
+    //                 for (int k = lo.k; k < hi.k; ++k)
+    //                 {
+    //                     const double J = Jac(i, j, k, 0);
+
+    //                     // ---- 1) cell 中心的“通量型反变分量” tilde B^* 由 face 平均 ----
+
+    //                     const double Bxi_m = Bxi(i, j, k, 0);
+    //                     const double Bxi_p = Bxi(i + 1, j, k, 0);
+    //                     const double Beta_m = Beta(i, j, k, 0);
+    //                     const double Beta_p = Beta(i, j + 1, k, 0);
+    //                     const double Bze_m = Bzeta(i, j, k, 0);
+    //                     const double Bze_p = Bzeta(i, j, k + 1, 0);
+
+    //                     const double Bxi_c = 0.5 * (Bxi_m + Bxi_p);
+    //                     const double Beta_c = 0.5 * (Beta_m + Beta_p);
+    //                     const double Bzeta_c = 0.5 * (Bze_m + Bze_p);
+
+    //                     // ---- 2) 反变分量 B^xi, B^eta, B^zeta ----
+    //                     // B^xi = (J B·grad xi)/J
+    //                     const double Bcontra_xi = Bxi_c / J;
+    //                     const double Bcontra_eta = Beta_c / J;
+    //                     const double Bcontra_ze = Bzeta_c / J;
+
+    //                     // ---- 3) 用协变基组装物理 B ----
+    //                     const double ax0 = axi(i, j, k, 0);
+    //                     const double ax1 = axi(i, j, k, 1);
+    //                     const double ax2 = axi(i, j, k, 2);
+
+    //                     const double ae0 = aeta(i, j, k, 0);
+    //                     const double ae1 = aeta(i, j, k, 1);
+    //                     const double ae2 = aeta(i, j, k, 2);
+
+    //                     const double az0 = aze(i, j, k, 0);
+    //                     const double az1 = aze(i, j, k, 1);
+    //                     const double az2 = aze(i, j, k, 2);
+
+    //                     double Bx_ind = Bcontra_xi * ax0 + Bcontra_eta * ae0 + Bcontra_ze * az0;
+    //                     double By_ind = Bcontra_xi * ax1 + Bcontra_eta * ae1 + Bcontra_ze * az1;
+    //                     double Bz_ind = Bcontra_xi * ax2 + Bcontra_eta * ae2 + Bcontra_ze * az2;
+
+    //                     // ---- 4) 背景场（如需）----
+    //                     const double Bx_tot = Bx_ind; //+ B_add_x;
+    //                     const double By_tot = By_ind; //+ B_add_y;
+    //                     const double Bz_tot = Bz_ind; //+ B_add_z;
+
+    //                     //----- 2.5 修改磁场和磁能----
+    //                     const double Bx_tot_old = Bcell(i, j, k, 0);
+    //                     const double By_tot_old = Bcell(i, j, k, 1);
+    //                     const double Bz_tot_old = Bcell(i, j, k, 2);
+    //                     const double Delta_Eb = 0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) - 0.5 * inver_MA2 * (Bx_tot_old * Bx_tot_old + By_tot_old * By_tot_old + Bz_tot_old * Bz_tot_old);
+
+    //                     // U(i, j, k, 4) += Delta_Eb;
+    //                     Bcell(i, j, k, 0) = Bx_tot;
+    //                     Bcell(i, j, k, 1) = By_tot;
+    //                     Bcell(i, j, k, 2) = Bz_tot;
+    //                 }
+    //     }
+    // }
 
     void calc_divB()
     {
