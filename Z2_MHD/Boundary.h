@@ -40,7 +40,8 @@ public:
                 // 这里你可以根据 patch.bc_name 判断是什么类型的边界
                 if (patch.bc_name == "Solid_Surface")
                 {
-                    apply_cell_wall(U, B_cell, patch);
+                    // apply_cell_wall(U, B_cell, patch);
+                    apply_cell_wall_lunar(U, B_cell, patch);
                 }
                 else if (patch.bc_name == "Outflow")
                 {
@@ -113,8 +114,8 @@ public:
                 int ib = patch.this_block;
                 FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
                 if (patch.bc_name == "Solid_Surface")
-                    // apply_cell_copy(U, patch);
-                    apply_derived_cell_wall(U, patch);
+                    apply_cell_copy(U, patch);
+                // apply_derived_cell_wall(U, patch);
                 else if (patch.bc_name == "Pole")
                     // apply_cell_pole(U, patch);
                     apply_cell_copy(U, patch);
@@ -455,6 +456,7 @@ private:
     //-------------------------------------------------------------------------
     // 针对不同边界类型做分发（根据 bc_name）
     void apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalRegion &patch);
+    void apply_cell_wall_lunar(FieldBlock &U, FieldBlock &Bcell, PhysicalRegion &patch);
     void apply_cell_farfield(FieldBlock &U, PhysicalRegion &patch);
     void apply_cell_copy(FieldBlock &U, PhysicalRegion &patch);
     void apply_cell_pole(FieldBlock &U, PhysicalRegion &patch);
