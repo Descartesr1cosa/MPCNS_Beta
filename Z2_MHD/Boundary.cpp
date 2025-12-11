@@ -100,9 +100,9 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalReg
     const double p_floor = 1e-8 * farfield_p;
 
     double p0, rho0, Bx, By, Bz, Eb, kin;
-    // double B_add_x = fld_->par->GetDou("B_add_x");
-    // double B_add_y = fld_->par->GetDou("B_add_y");
-    // double B_add_z = fld_->par->GetDou("B_add_z");
+    double B_add_x = fld_->par->GetDou("B_add_x");
+    double B_add_y = fld_->par->GetDou("B_add_y");
+    double B_add_z = fld_->par->GetDou("B_add_z");
 
     int32_t i, j, k;
     for (int32_t ii = lo.i; ii < hi.i; ii++)
@@ -130,6 +130,12 @@ void MHD_Boundary::apply_cell_wall(FieldBlock &U, FieldBlock &Bcell, PhysicalReg
                 p0 = (U(ii, jj, kk, 4) - kin - Eb) * (gamma_ - 1.0);
                 if (p0 < p_floor)
                     p0 = p_floor; // 仅做极弱保护
+
+                rho0 = 0.01;
+                Bx = B_add_x;
+                By = B_add_y;
+                Bz = B_add_z;
+                Eb = 0.5 * inver_MA2 * (Bx * Bx + By * By + Bz * Bz);
 
                 // 反射法向速度，切向保留
                 double vn2 = 2.0 * dot(vec_v, vec_face); // 2 (v·n)
