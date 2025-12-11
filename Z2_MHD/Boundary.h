@@ -52,7 +52,8 @@ public:
                 }
                 else if (patch.bc_name == "Pole")
                 {
-                    apply_cell_pole(U, patch);
+                    // apply_cell_pole(U, patch);
+                    apply_cell_copy(U, patch);
                 }
                 else
                 {
@@ -112,10 +113,11 @@ public:
                 int ib = patch.this_block;
                 FieldBlock &U = fld_->field(field_id, ib); // 该块上的 U
                 if (patch.bc_name == "Solid_Surface")
-                    apply_cell_copy(U, patch);
-                // apply_derived_cell_wall(U, patch);
+                    // apply_cell_copy(U, patch);
+                    apply_derived_cell_wall(U, patch);
                 else if (patch.bc_name == "Pole")
-                    apply_cell_pole(U, patch);
+                    // apply_cell_pole(U, patch);
+                    apply_cell_copy(U, patch);
                 else
                     apply_cell_copy(U, patch);
             }
@@ -168,7 +170,7 @@ public:
                             count = 0.0;
 
                             // Sum
-                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
+                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k - 1; k++)
                             {
                                 temp += U(i, j, k, 0);
                                 count += 1.0;
@@ -179,7 +181,7 @@ public:
 
                             // Unified
                             for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
-                                U(i, j, k, 0) = temp;
+                                U(i, j, k, 0) = 2 * temp;
                         }
                 }
                 else if (field_name == "E_eta" && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
@@ -192,7 +194,7 @@ public:
                             count = 0.0;
 
                             // Sum
-                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
+                            for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k - 1; k++)
                             {
                                 temp += U(i, j, k, 0);
                                 count += 1.0;
@@ -203,7 +205,7 @@ public:
 
                             // Unified
                             for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
-                                U(i, j, k, 0) = temp;
+                                U(i, j, k, 0) = 2 * temp;
                         }
                 }
                 else if (field_name == "E_eta" && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
