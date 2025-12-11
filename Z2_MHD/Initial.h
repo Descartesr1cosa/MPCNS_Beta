@@ -201,39 +201,39 @@ private:
                             Bze_blk(i, j, k, 0) = 0.0;
             }
 
-            // --- FaceXi 上的感应 B^ξ ---
-            {
-                FieldBlock &Bxi_blk = fld->field(fid_Bxi, iblock);
-                FieldBlock &xi = fld->field("JDxi", iblock);
-                const Int3 &lo = Bxi_blk.inner_lo();
-                const Int3 &hi = Bxi_blk.inner_hi();
-                for (int i = lo.i; i < hi.i; ++i)
-                    for (int j = lo.j; j < hi.j; ++j)
-                        for (int k = lo.k; k < hi.k; ++k)
-                            Bxi_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2); // 感应场从 0 开始
-            }
-            // --- FaceEt 上的感应 B^η ---
-            {
-                FieldBlock &Beta_blk = fld->field(fid_Beta, iblock);
-                FieldBlock &xi = fld->field("JDet", iblock);
-                const Int3 &lo = Beta_blk.inner_lo();
-                const Int3 &hi = Beta_blk.inner_hi();
-                for (int i = lo.i; i < hi.i; ++i)
-                    for (int j = lo.j; j < hi.j; ++j)
-                        for (int k = lo.k; k < hi.k; ++k)
-                            Beta_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2);
-            }
-            // --- FaceZe 上的感应 B^ζ ---
-            {
-                FieldBlock &Bze_blk = fld->field(fid_Bze, iblock);
-                FieldBlock &xi = fld->field("JDze", iblock);
-                const Int3 &lo = Bze_blk.inner_lo();
-                const Int3 &hi = Bze_blk.inner_hi();
-                for (int i = lo.i; i < hi.i; ++i)
-                    for (int j = lo.j; j < hi.j; ++j)
-                        for (int k = lo.k; k < hi.k; ++k)
-                            Bze_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2);
-            }
+            // // --- FaceXi 上的感应 B^ξ ---
+            // {
+            //     FieldBlock &Bxi_blk = fld->field(fid_Bxi, iblock);
+            //     FieldBlock &xi = fld->field("JDxi", iblock);
+            //     const Int3 &lo = Bxi_blk.inner_lo();
+            //     const Int3 &hi = Bxi_blk.inner_hi();
+            //     for (int i = lo.i; i < hi.i; ++i)
+            //         for (int j = lo.j; j < hi.j; ++j)
+            //             for (int k = lo.k; k < hi.k; ++k)
+            //                 Bxi_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2); // 感应场从 0 开始
+            // }
+            // // --- FaceEt 上的感应 B^η ---
+            // {
+            //     FieldBlock &Beta_blk = fld->field(fid_Beta, iblock);
+            //     FieldBlock &xi = fld->field("JDet", iblock);
+            //     const Int3 &lo = Beta_blk.inner_lo();
+            //     const Int3 &hi = Beta_blk.inner_hi();
+            //     for (int i = lo.i; i < hi.i; ++i)
+            //         for (int j = lo.j; j < hi.j; ++j)
+            //             for (int k = lo.k; k < hi.k; ++k)
+            //                 Beta_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2);
+            // }
+            // // --- FaceZe 上的感应 B^ζ ---
+            // {
+            //     FieldBlock &Bze_blk = fld->field(fid_Bze, iblock);
+            //     FieldBlock &xi = fld->field("JDze", iblock);
+            //     const Int3 &lo = Bze_blk.inner_lo();
+            //     const Int3 &hi = Bze_blk.inner_hi();
+            //     for (int i = lo.i; i < hi.i; ++i)
+            //         for (int j = lo.j; j < hi.j; ++j)
+            //             for (int k = lo.k; k < hi.k; ++k)
+            //                 Bze_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2);
+            // }
 
             // --- Edge 上的 EMF 也设零（可选，但推荐） ---
             {

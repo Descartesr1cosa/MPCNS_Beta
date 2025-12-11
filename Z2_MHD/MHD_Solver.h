@@ -301,7 +301,7 @@ private:
         const int nblock = fld_->num_blocks();
 
         const double eps = 1e-300;
-        const double delta = 1e-6; // same spirit as your reference
+        const double delta = 1e-15; // same spirit as your reference
 
         auto dot = [&](const std::array<double, 3> &a, const std::array<double, 3> &b)
         {
@@ -501,9 +501,9 @@ private:
                         double Bz_ind = inv * (C02 * rx + C12 * ry + C22 * rz);
 
                         // background field if you want it
-                        const double Bx_tot = Bx_ind; // + B_add_x;
-                        const double By_tot = By_ind; // + B_add_y;
-                        const double Bz_tot = Bz_ind; // + B_add_z;
+                        const double Bx_tot = Bx_ind + B_add_x;
+                        const double By_tot = By_ind + B_add_y;
+                        const double Bz_tot = Bz_ind + B_add_z;
 
                         // energy consistency (keep your existing style)
                         const double Bx_old = Bcell(i, j, k, 0);
