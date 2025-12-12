@@ -831,6 +831,449 @@ void MHD_Output::output_plt_cell_field(const std::vector<std::string> &var_list)
     std::fclose(fp);
 }
 
+void MHD_Output::output_plt_node_field(const std::vector<std::string> &var_list)
+{
+    Grid *grd = fld->grd;
+    Param *par = fld->par;
+
+    //============================== 1. 准备文件 ==============================
+    std::string path = "./DATA/flow_field" + filename + ".plt";
+    const char *filenameall = path.c_str();
+
+    {
+        std::ofstream test(path, std::ios::out);
+        if (!test)
+        {
+            std::string cmd = "mkdir DATA";
+            std::system(cmd.c_str());
+        }
+    }
+
+    FILE *fp = std::fopen(filenameall, "wb");
+    if (!fp)
+    {
+        std::printf("Failed to open file %s\n", filenameall);
+        std::exit(-1);
+    }
+
+    auto write_int32 = [&](int32_t v)
+    { std::fwrite(&v, 4, 1, fp); };
+    auto write_float = [&](float v)
+    { std::fwrite(&v, 4, 1, fp); };
+    auto write_double = [&](double v)
+    { std::fwrite(&v, 8, 1, fp); };
+
+    // 一个局部的 ZoneHeader 写法：全部变量标记为 Nodal
+    auto my_plt_write_ZoneHeadersection = [](const std::string &Zone_name,
+                                             int *mxyz,
+                                             FILE *file, int n_var_plt)
+    {
+        auto write_int32 = [&](int32_t v)
+        { std::fwrite(&v, 4, 1, file); };
+        auto write_float = [&](float v)
+        { std::fwrite(&v, 4, 1, file); };
+        auto write_double = [&](double v)
+        { std::fwrite(&v, 8, 1, file); };
+        auto write_string = [&](const char *str, FILE *ff)
+        {
+            int value = 0;
+            const char *p = str;
+            while (*p != '\0')
+            {
+                value = static_cast<int>(*p);
+                std::fwrite(&value, sizeof(int), 1, ff);
+                ++p;
+            }
+            value = static_cast<int>('\0');
+            std::fwrite(&value, sizeof(int), 1, ff);
+        };
+
+        // Tecplot zone marker
+        write_float(299.0f);
+
+        // Zone 名字
+        write_string(Zone_name.c_str(), file);
+
+        // parent zone id
+        int32_t parentZone = -1;
+        write_int32(parentZone);
+        // strand id
+        int32_t strandId = -2;
+        write_int32(strandId);
+        // solution time
+        double solTime = 0.0;
+        write_double(solTime);
+        // zone color
+        write_int32(-1);
+        // zone type: 0 = ORDERED
+        write_int32(0);
+
+        // 是否指定每个变量的位置：1=是
+        int32_t specify_var_location = 1;
+        write_int32(specify_var_location);
+
+        // 每个变量的位置：0= nodal, 1 = cell-centered
+        // 这里全部 nodal
+        for (int v = 0; v < n_var_plt; ++v)
+        {
+            int32_t loc = 0;
+            write_int32(loc);
+        }
+
+        // Are raw local 1-to-1 face neighbors supplied? 0=FALSE
+        write_int32(0);
+        // Number of miscellaneous user-defined face neighbor connections: 0
+        write_int32(0);
+
+        // IMax, JMax, KMax
+        write_int32(mxyz[0]);
+        write_int32(mxyz[1]);
+        write_int32(mxyz[2]);
+
+        // AuxData count = 0
+        write_int32(0);
+    };
+
+    //============================== 2. 变量名列表 ==============================
+    std::vector<std::string> var_names;
+    var_names.reserve(3 + var_list.size());
+    var_names.push_back("x");
+    var_names.push_back("y");
+    var_names.push_back("z");
+    for (auto &s : var_list)
+        var_names.push_back(s);
+
+    const int n_var = static_cast<int>(var_names.size());
+
+    // 写 Header（变量名）
+    plt_write_Headersection("flow_field", var_names, fp);
+
+    //============================== 3. Zone Header ==============================
+    for (int ib = 0; ib < grd->nblock; ++ib)
+    {
+        const Block &blk = grd->grids(ib);
+        if (blk.block_name != "Fluid")
+            continue;
+
+        const int Ni = blk.mx;
+        const int Nj = blk.my;
+        const int Nk = blk.mz;
+
+        const int Ni_node = Ni + 1;
+        const int Nj_node = Nj + 1;
+        const int Nk_node = Nk + 1;
+
+        int mxyz[3] = {Ni_node, Nj_node, Nk_node};
+        std::string zone_name = "Zone" + std::to_string(ib);
+
+        my_plt_write_ZoneHeadersection(zone_name, mxyz, fp, n_var);
+    }
+
+    // Header结束marker
+    write_float(357.0f);
+
+    //============================== 4. 找到需要的 Field ==============================
+    const int fid_U = fld->field_id("U_");
+    const int fid_PV = fld->field_id("PV_");
+    const int fid_divB = fld->field_id("divB");
+
+    const FieldDescriptor &descU = fld->descriptor(fid_U);
+    if (descU.location != StaggerLocation::Cell || descU.ncomp < 5)
+    {
+        std::cout << "Fatal Error: \"U_\" 必须是 Cell-centered 且至少 5 分量（rho, rho*u, rho*v, rho*w, E）。\n";
+        std::exit(-1);
+    }
+
+    // 看看有没有请求 Bx/By/Bz，如果有就需要 B_cell
+    bool need_B = false;
+    for (auto &s : var_list)
+        if (s == "Bx" || s == "By" || s == "Bz")
+            need_B = true;
+
+    int fid_Bc = -1;
+    if (need_B)
+    {
+        fid_Bc = fld->field_id("B_cell");
+        const FieldDescriptor &descBc = fld->descriptor(fid_Bc);
+        if (descBc.location != StaggerLocation::Cell || descBc.ncomp < 3)
+        {
+            std::cout << "Fatal Error: Output Bx/By/Bz, but \"B_cell\" is not Cell-centered 3 component \n";
+            std::cout << descBc.ncomp << "\tfid_Bc=\t" << fid_Bc << std::endl;
+            std::exit(-1);
+        }
+    }
+
+    //============================== 5. Data Section（插值到 Node 输出） ==============================
+    for (int iblock = 0; iblock < grd->nblock; ++iblock)
+    {
+        Block &blk = grd->grids(iblock);
+        if (blk.block_name != "Fluid")
+            continue;
+
+        const int Ni = blk.mx;
+        const int Nj = blk.my;
+        const int Nk = blk.mz;
+
+        const int Ni_node = Ni + 1;
+        const int Nj_node = Nj + 1;
+        const int Nk_node = Nk + 1;
+
+        FieldBlock &Ublk = fld->field(fid_U, iblock);
+        FieldBlock &PVblk = fld->field(fid_PV, iblock);
+        FieldBlock &divBblk = fld->field(fid_divB, iblock);
+        FieldBlock *Bcblk_ptr = nullptr;
+        if (need_B)
+            Bcblk_ptr = &fld->field(fid_Bc, iblock);
+
+        // zone data header
+        plt_write_DataSection(const_cast<int &>(n_var), fp);
+
+        // 一个小 helper：给定 (i,j,k) 结点，取周围 cell 平均
+        auto interp_cell_to_node = [&](auto get_cell_value, int i, int j, int k) -> double
+        {
+            double sum = 0.0;
+            int cnt = 0;
+            for (int kk = k - 1; kk <= k; ++kk)
+            {
+                // if (kk < 0 || kk >= Nk)
+                //     continue;
+                for (int jj = j - 1; jj <= j; ++jj)
+                {
+                    // if (jj < 0 || jj >= Nj)
+                    //     continue;
+                    for (int ii = i - 1; ii <= i; ++ii)
+                    {
+                        // if (ii < 0 || ii >= Ni)
+                        //     continue;
+                        sum += get_cell_value(ii, jj, kk);
+                        ++cnt;
+                    }
+                }
+            }
+            return sum / static_cast<double>(cnt); //(cnt > 0) ? () : 0.0;
+        };
+
+        // ---------- 5.1 先写每个变量的 min/max（在 node 上） ----------
+        for (int v = 0; v < n_var; ++v)
+        {
+            const std::string &name = var_names[v];
+
+            double minv = 0.0;
+            double maxv = 0.0;
+            bool first = true;
+
+            for (int k = 0; k < Nk_node; ++k)
+            {
+                for (int j = 0; j < Nj_node; ++j)
+                {
+                    for (int i = 0; i < Ni_node; ++i)
+                    {
+                        double val = 0.0;
+
+                        if (name == "x")
+                        {
+                            val = blk.x(i, j, k);
+                        }
+                        else if (name == "y")
+                        {
+                            val = blk.y(i, j, k);
+                        }
+                        else if (name == "z")
+                        {
+                            val = blk.z(i, j, k);
+                        }
+                        else if (name == "rho")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return Ublk(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else if (name == "u")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else if (name == "v")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 1); },
+                                i, j, k);
+                        }
+                        else if (name == "w")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 2); },
+                                i, j, k);
+                        }
+                        else if (name == "p")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 3); },
+                                i, j, k);
+                        }
+                        else if (name == "Bx" && need_B)
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return (*Bcblk_ptr)(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else if (name == "By" && need_B)
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return (*Bcblk_ptr)(ic, jc, kc, 1); },
+                                i, j, k);
+                        }
+                        else if (name == "Bz" && need_B)
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return (*Bcblk_ptr)(ic, jc, kc, 2); },
+                                i, j, k);
+                        }
+                        else if (name == "divB")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return divBblk(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else
+                        {
+                            // 未支持的名字，全部输出 0
+                            val = 0.0;
+                        }
+
+                        if (first)
+                        {
+                            minv = maxv = val;
+                            first = false;
+                        }
+                        else
+                        {
+                            if (val < minv)
+                                minv = val;
+                            if (val > maxv)
+                                maxv = val;
+                        }
+                    }
+                }
+            }
+
+            write_double(minv);
+            write_double(maxv);
+        }
+
+        // ---------- 5.2 再写具体数据（在 node 上） ----------
+        for (int v = 0; v < n_var; ++v)
+        {
+            const std::string &name = var_names[v];
+
+            for (int k = 0; k < Nk_node; ++k)
+            {
+                for (int j = 0; j < Nj_node; ++j)
+                {
+                    for (int i = 0; i < Ni_node; ++i)
+                    {
+                        double val = 0.0;
+
+                        if (name == "x")
+                        {
+                            val = blk.x(i, j, k);
+                        }
+                        else if (name == "y")
+                        {
+                            val = blk.y(i, j, k);
+                        }
+                        else if (name == "z")
+                        {
+                            val = blk.z(i, j, k);
+                        }
+                        else if (name == "rho")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return Ublk(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else if (name == "u")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else if (name == "v")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 1); },
+                                i, j, k);
+                        }
+                        else if (name == "w")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 2); },
+                                i, j, k);
+                        }
+                        else if (name == "p")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return PVblk(ic, jc, kc, 3); },
+                                i, j, k);
+                        }
+                        else if (name == "Bx" && need_B)
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return (*Bcblk_ptr)(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else if (name == "By" && need_B)
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return (*Bcblk_ptr)(ic, jc, kc, 1); },
+                                i, j, k);
+                        }
+                        else if (name == "Bz" && need_B)
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return (*Bcblk_ptr)(ic, jc, kc, 2); },
+                                i, j, k);
+                        }
+                        else if (name == "divB")
+                        {
+                            val = interp_cell_to_node(
+                                [&](int ic, int jc, int kc)
+                                { return divBblk(ic, jc, kc, 0); },
+                                i, j, k);
+                        }
+                        else
+                        {
+                            val = 0.0;
+                        }
+
+                        write_float(static_cast<float>(val));
+                    }
+                }
+            }
+        }
+    }
+
+    std::fclose(fp);
+}
+
 void MHD_Output::get_filename(Param *par)
 {
     int32_t my_id = par->GetInt("myid");

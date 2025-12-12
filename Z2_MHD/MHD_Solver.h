@@ -82,12 +82,13 @@ public:
             // 5. 更新控制
             control_.Update();
             if (control_.if_outfile)
-                output_.output_plt_cell_field(output_.var_defaut_plt_name);
+                output_.output_field();
+            // output_.output_plt_cell_field(output_.var_defaut_plt_name); //For debug
             // output_.output_plt_field(); // output_.output_plt_cell_field(output_.var_defaut_plt_name); // output_field();
             if (control_.if_stop)
             {
-                output_.output_plt_cell_field(output_.var_defaut_plt_name);
-                // output_.output_field();
+                // output_.output_plt_cell_field(output_.var_defaut_plt_name); //For debug
+                output_.output_field();
                 break;
             }
         }
@@ -140,15 +141,15 @@ private:
         std::string Bcell_string = "B_cell";
         bound_.add_derived_Cell_boundary(Bcell_string);
         halo_->data_trans(Bcell_string);
-        // halo_->data_trans_2DCorner(Bcell_string);
-        // halo_->data_trans_3DCorner(Bcell_string);
+        halo_->data_trans_2DCorner(Bcell_string);
+        halo_->data_trans_3DCorner(Bcell_string);
 
         // D) U_ 的物理边界（此时可安全用 B_cell） + halo (暂时不用角区通信)
         std::string U_string = "U_";
         bound_.add_Cell_boundary(U_string);
         halo_->data_trans(U_string);
-        // halo_->data_trans_2DCorner(U_string);
-        // halo_->data_trans_3DCorner(U_string);
+        halo_->data_trans_2DCorner(U_string);
+        halo_->data_trans_3DCorner(U_string);
 
         // E) 原始量 + divB
         calc_PV();
@@ -522,88 +523,6 @@ private:
                     }
         }
     }
-
-    // void calc_Bcell()
-    // {
-    //     const int nblock = fld_->num_blocks();
-
-    //     for (int ib = 0; ib < nblock; ++ib)
-    //     {
-    //         auto &Bcell = fld_->field(fid_Bcell, ib);
-    //         auto &U = fld_->field(fid_U, ib);
-    //         auto &Bxi = fld_->field(fid_Bxi, ib);
-    //         auto &Beta = fld_->field(fid_Beta, ib);
-    //         auto &Bzeta = fld_->field(fid_Bzeta, ib);
-
-    //         auto &Jac = fld_->field(fid_Jac, ib);
-
-    //         auto &axi = fld_->field("a_xi", ib);
-    //         auto &aeta = fld_->field("a_eta", ib);
-    //         auto &aze = fld_->field("a_zeta", ib);
-    //         // 这里用几何体积的 inner_lo/inner_hi 作为 cell 中心循环范围
-    //         Int3 lo = Jac.inner_lo();
-    //         Int3 hi = Jac.inner_hi();
-
-    //         for (int i = lo.i; i < hi.i; ++i)
-    //             for (int j = lo.j; j < hi.j; ++j)
-    //                 for (int k = lo.k; k < hi.k; ++k)
-    //                 {
-    //                     const double J = Jac(i, j, k, 0);
-
-    //                     // ---- 1) cell 中心的“通量型反变分量” tilde B^* 由 face 平均 ----
-
-    //                     const double Bxi_m = Bxi(i, j, k, 0);
-    //                     const double Bxi_p = Bxi(i + 1, j, k, 0);
-    //                     const double Beta_m = Beta(i, j, k, 0);
-    //                     const double Beta_p = Beta(i, j + 1, k, 0);
-    //                     const double Bze_m = Bzeta(i, j, k, 0);
-    //                     const double Bze_p = Bzeta(i, j, k + 1, 0);
-
-    //                     const double Bxi_c = 0.5 * (Bxi_m + Bxi_p);
-    //                     const double Beta_c = 0.5 * (Beta_m + Beta_p);
-    //                     const double Bzeta_c = 0.5 * (Bze_m + Bze_p);
-
-    //                     // ---- 2) 反变分量 B^xi, B^eta, B^zeta ----
-    //                     // B^xi = (J B·grad xi)/J
-    //                     const double Bcontra_xi = Bxi_c / J;
-    //                     const double Bcontra_eta = Beta_c / J;
-    //                     const double Bcontra_ze = Bzeta_c / J;
-
-    //                     // ---- 3) 用协变基组装物理 B ----
-    //                     const double ax0 = axi(i, j, k, 0);
-    //                     const double ax1 = axi(i, j, k, 1);
-    //                     const double ax2 = axi(i, j, k, 2);
-
-    //                     const double ae0 = aeta(i, j, k, 0);
-    //                     const double ae1 = aeta(i, j, k, 1);
-    //                     const double ae2 = aeta(i, j, k, 2);
-
-    //                     const double az0 = aze(i, j, k, 0);
-    //                     const double az1 = aze(i, j, k, 1);
-    //                     const double az2 = aze(i, j, k, 2);
-
-    //                     double Bx_ind = Bcontra_xi * ax0 + Bcontra_eta * ae0 + Bcontra_ze * az0;
-    //                     double By_ind = Bcontra_xi * ax1 + Bcontra_eta * ae1 + Bcontra_ze * az1;
-    //                     double Bz_ind = Bcontra_xi * ax2 + Bcontra_eta * ae2 + Bcontra_ze * az2;
-
-    //                     // ---- 4) 背景场（如需）----
-    //                     const double Bx_tot = Bx_ind; //+ B_add_x;
-    //                     const double By_tot = By_ind; //+ B_add_y;
-    //                     const double Bz_tot = Bz_ind; //+ B_add_z;
-
-    //                     //----- 2.5 修改磁场和磁能----
-    //                     const double Bx_tot_old = Bcell(i, j, k, 0);
-    //                     const double By_tot_old = Bcell(i, j, k, 1);
-    //                     const double Bz_tot_old = Bcell(i, j, k, 2);
-    //                     const double Delta_Eb = 0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) - 0.5 * inver_MA2 * (Bx_tot_old * Bx_tot_old + By_tot_old * By_tot_old + Bz_tot_old * Bz_tot_old);
-
-    //                     // U(i, j, k, 4) += Delta_Eb;
-    //                     Bcell(i, j, k, 0) = Bx_tot;
-    //                     Bcell(i, j, k, 1) = By_tot;
-    //                     Bcell(i, j, k, 2) = Bz_tot;
-    //                 }
-    //     }
-    // }
 
     void calc_divB()
     {

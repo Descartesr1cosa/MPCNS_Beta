@@ -12,6 +12,42 @@ public:
         if (par->GetBoo("continue_calc"))
         {
             Read_bin_Initial(fld);
+
+            List<double> temp;
+            temp = par->GetDou_List("INITIAL");
+            // ---- 常数 ----
+            double gamma = par->GetDou_List("constant").data["gamma"];
+            double NA = par->GetDou_List("constant").data["NA"];
+            double R_uni = par->GetDou_List("constant").data["R_uni"];
+            // ---- 背景磁场（物理单位）----
+            double Bx_phy = temp.data["Bx"];
+            double By_phy = temp.data["By"];
+            double Bz_phy = temp.data["Bz"];
+
+            double B_ref = par->GetDou("B_ref");
+            // 无量纲背景磁场
+            double Bx = Bx_phy / B_ref;
+            double By = By_phy / B_ref;
+            double Bz = Bz_phy / B_ref;
+
+            // 把无量纲 B_add 存进 Param，后面求解器/通量都可以直接用
+            par->AddParam("B_add_x", Bx);
+            par->AddParam("B_add_y", By);
+            par->AddParam("B_add_z", Bz);
+
+            // ---- 流体参考量 ----
+            double Velocity_ref = temp.data["U"];
+            double n_ref = temp.data["n"];
+            double Molecular_mass = temp.data["Molecular_mass"];
+            double k_Boltz = R_uni / NA;
+            double rho_ref = Molecular_mass / NA * n_ref;
+            double mu_mag = par->GetDou_List("constant").data["mu_mag"];
+            double c_A = B_ref / std::sqrt(mu_mag * rho_ref);
+
+            double M_A = Velocity_ref / c_A; // Alfven Mach 数
+
+            // 把无量纲 M_A^(-2)加入par便于调用
+            par->AddParam("inver_MA2", 1.0 / (M_A * M_A));
         }
         else
         {

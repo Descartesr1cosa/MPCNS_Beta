@@ -33,7 +33,8 @@ public:
     void output_field()
     {
         output_bin_field();
-        output_plt_field();
+        // output_plt_field();
+        output_plt_node_field(var_defaut_plt_name);
     };
 
     //=====================================================
@@ -45,8 +46,12 @@ public:
     // 输出tecplot二进制文件，用于快速获取流场
     void output_plt_field() { output_plt_field(var_defaut_plt_name); };
     // 可以指定要输出的字段名
+    // xyz为Node 其他为Cell
     void output_plt_field(const std::vector<std::string> &var_list);
+    // 均为Cell 当成node输出
     void output_plt_cell_field(const std::vector<std::string> &var_list);
+    // Cell插值到node上输出
+    void output_plt_node_field(const std::vector<std::string> &var_list);
     //=====================================================
 
 private:
