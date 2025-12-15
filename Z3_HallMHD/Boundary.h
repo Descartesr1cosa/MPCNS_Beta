@@ -217,6 +217,21 @@ public:
         }
     }
 
+    void add_Edge_copy_boundary(std::string field_name)
+    {
+        int32_t field_id = fld_->field_id(field_name);
+        const FieldDescriptor &desc = fld_->descriptor(field_id);
+        // 未来可以用于分辨Cell Face Edge
+        for (auto &patch : phy_patterns_[desc.location].regions)
+        {
+            const int ib = patch.this_block;
+            FieldBlock &U = fld_->field(field_id, ib); // 该face上的 U
+
+            // 默认给Face使用简单的拷贝边界
+            apply_edge_copy(U, patch);
+        }
+    }
+
 private:
     //===================================================================================
     // Physical Pattern Data
@@ -435,6 +450,142 @@ private:
             }
             phy_patterns_[StaggerLocation::FaceZe] = std::move(tmp);
         }
+
+        // EdgeXi
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::EdgeXi;
+
+            for (auto &p : topo_->physical_patches)
+            {
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                std::vector<int> sub(3), sup(3);
+                sub = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                // EdgeXi: i cell-based => no +1; j,k node-based => +1
+                sup = {p.raw->sup[0], p.raw->sup[1] + 1, p.raw->sup[2] + 1}; // 开区间
+
+                // 只有法向为 xi（abs=1）时，i 为 cell-based，需要扩展一层
+                if (abs(p.direction) == 1)
+                {
+                    if (p.direction < 0)
+                        sup[0] += 1; // 低端边界：向外扩展到 ghost
+                    else
+                        sub[0] -= 1; // 高端边界：向外扩展到 ghost
+                }
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0];
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1];
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2];
+
+                tmp.regions.push_back(phy);
+            }
+
+            phy_patterns_[StaggerLocation::EdgeXi] = std::move(tmp);
+        }
+
+        // EdgeEt
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::EdgeEt;
+
+            for (auto &p : topo_->physical_patches)
+            {
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                std::vector<int> sub(3), sup(3);
+                sub = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                // EdgeEt: j cell-based => no +1; i,k node-based => +1
+                sup = {p.raw->sup[0] + 1, p.raw->sup[1], p.raw->sup[2] + 1}; // 开区间
+
+                // 只有法向为 eta（abs=2）时，j 为 cell-based，需要扩展一层
+                if (abs(p.direction) == 2)
+                {
+                    if (p.direction < 0)
+                        sup[1] += 1;
+                    else
+                        sub[1] -= 1;
+                }
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0];
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1];
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2];
+
+                tmp.regions.push_back(phy);
+            }
+
+            phy_patterns_[StaggerLocation::EdgeEt] = std::move(tmp);
+        }
+
+        // EdgeZe
+        {
+            PhysicalPattern tmp;
+            tmp.location = StaggerLocation::EdgeZe;
+
+            for (auto &p : topo_->physical_patches)
+            {
+                PhysicalRegion phy;
+                phy.this_block = p.this_block;
+                phy.this_block_name = p.this_block_name;
+                phy.bc_id = p.bc_id;
+                phy.bc_name = p.bc_name;
+                phy.raw = p.raw;
+
+                phy.cycle.i = p.raw->cycle[0];
+                phy.cycle.j = p.raw->cycle[1];
+                phy.cycle.k = p.raw->cycle[2];
+
+                std::vector<int> sub(3), sup(3);
+                sub = {p.raw->sub[0], p.raw->sub[1], p.raw->sub[2]};
+                // EdgeZe: k cell-based => no +1; i,j node-based => +1
+                sup = {p.raw->sup[0] + 1, p.raw->sup[1] + 1, p.raw->sup[2]}; // 开区间
+
+                // 只有法向为 zeta（abs=3）时，k 为 cell-based，需要扩展一层
+                if (abs(p.direction) == 3)
+                {
+                    if (p.direction < 0)
+                        sup[2] += 1;
+                    else
+                        sub[2] -= 1;
+                }
+
+                phy.box_bound.lo.i = sub[0];
+                phy.box_bound.hi.i = sup[0];
+                phy.box_bound.lo.j = sub[1];
+                phy.box_bound.hi.j = sup[1];
+                phy.box_bound.lo.k = sub[2];
+                phy.box_bound.hi.k = sup[2];
+
+                tmp.regions.push_back(phy);
+            }
+
+            phy_patterns_[StaggerLocation::EdgeZe] = std::move(tmp);
+        }
+
         if (par_->GetInt("myid") == 0)
             std::cout << "***********Finish the Physical Pattern building Process! !************\n\n"
                       << std::flush;
@@ -469,6 +620,12 @@ private:
     //-------------------------------------------------------------------------
     // 针对Face暂时采用拷贝边界
     void apply_face_copy(FieldBlock &U, PhysicalRegion &patch);
+
+    //-------------------------------------------------------------------------
+    // Edge
+    //-------------------------------------------------------------------------
+    // 针对Edge暂时采用拷贝边界
+    void apply_edge_copy(FieldBlock &U, PhysicalRegion &patch);
     //===================================================================================
 
     //===================================================================================

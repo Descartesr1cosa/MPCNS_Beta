@@ -19,12 +19,14 @@ public:
             double gamma = par->GetDou_List("constant").data["gamma"];
             double NA = par->GetDou_List("constant").data["NA"];
             double R_uni = par->GetDou_List("constant").data["R_uni"];
+            double q_e = par->GetDou_List("constant").data["q_e"];
             // ---- 背景磁场（物理单位）----
             double Bx_phy = temp.data["Bx"];
             double By_phy = temp.data["By"];
             double Bz_phy = temp.data["Bz"];
 
             double B_ref = par->GetDou("B_ref");
+            double L_ref = par->GetDou("L_ref");
             // 无量纲背景磁场
             double Bx = Bx_phy / B_ref;
             double By = By_phy / B_ref;
@@ -45,6 +47,12 @@ public:
             double c_A = B_ref / std::sqrt(mu_mag * rho_ref);
 
             double M_A = Velocity_ref / c_A; // Alfven Mach 数
+
+            double R_Larmor = Molecular_mass / NA * Velocity_ref / (B_ref * q_e);
+            double phi = R_Larmor / L_ref;
+
+            // 把无量纲 phi加入par便于调用
+            par->AddParam("phi", phi);
 
             // 把无量纲 M_A^(-2)加入par便于调用
             par->AddParam("inver_MA2", 1.0 / (M_A * M_A));
@@ -78,6 +86,7 @@ public:
         double gamma = par->GetDou_List("constant").data["gamma"];
         double NA = par->GetDou_List("constant").data["NA"];
         double R_uni = par->GetDou_List("constant").data["R_uni"];
+        double q_e = par->GetDou_List("constant").data["q_e"];
 
         // ---- 流向单位向量 ----
         double c_y = temp.data["c_y"];
@@ -90,6 +99,7 @@ public:
         double Bz_phy = temp.data["Bz"];
 
         double B_ref = par->GetDou("B_ref");
+        double L_ref = par->GetDou("L_ref");
         // 无量纲背景磁场
         double Bx = Bx_phy / B_ref;
         double By = By_phy / B_ref;
@@ -115,9 +125,12 @@ public:
         double c_A = B_ref / std::sqrt(mu_mag * rho_ref);
         double Velocity_ref = U_ref;
         double M_A = Velocity_ref / c_A; // Alfven Mach 数
+        double R_Larmor = Molecular_mass / NA * Velocity_ref / (B_ref * q_e);
+        double phi = R_Larmor / L_ref;
 
         // 把无量纲 M_A^(-2)加入par便于调用
         par->AddParam("inver_MA2", 1.0 / (M_A * M_A));
+        par->AddParam("phi", phi);
 
         // ---- 无量纲原始量 ----
         double rho0 = 1.0;

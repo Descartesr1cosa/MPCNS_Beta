@@ -53,6 +53,16 @@ int main(int arg, char **argv)
     fld->register_field({"E_xi", StaggerLocation::EdgeXi, 1, ngg});
     fld->register_field({"E_eta", StaggerLocation::EdgeEt, 1, ngg});
     fld->register_field({"E_zeta", StaggerLocation::EdgeZe, 1, ngg});
+#if HALL_MODE != 0
+    // 辅助Hall电场变量
+    fld->register_field({"Ehall_xi", StaggerLocation::EdgeXi, 1, ngg});
+    fld->register_field({"Ehall_eta", StaggerLocation::EdgeEt, 1, ngg});
+    fld->register_field({"Ehall_zeta", StaggerLocation::EdgeZe, 1, ngg});
+    fld->register_field({"J_xi", StaggerLocation::EdgeXi, 1, ngg});
+    fld->register_field({"J_eta", StaggerLocation::EdgeEt, 1, ngg});
+    fld->register_field({"J_zeta", StaggerLocation::EdgeZe, 1, ngg});
+#endif
+
     // 辅助磁场
     fld->register_field({"B_cell", StaggerLocation::Cell, 3, ngg});
     // 流体方程通量，辅助

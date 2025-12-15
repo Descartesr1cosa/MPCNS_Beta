@@ -7,6 +7,7 @@
 #include "Output.h"
 #include "Boundary.h"
 #include "Initial.h"
+#include "HallConfig.h"
 
 #include <array>
 
@@ -59,6 +60,7 @@ public:
         B_add_z = par->GetDou("B_add_z");
 
         inver_MA2 = par->GetDou("inver_MA2");
+        hall_coef = inver_MA2 * par->GetDou("phi");
 
         control_.SetUp(par_, 8);
         output_.SetUp(par_, fld_);
@@ -110,7 +112,7 @@ private:
     int fid_F_[3], fid_Eface_[3], fid_Bface_[3], fid_metric_[3];
 
     std::vector<std::string> Solver_Name_;
-    double gamma_, B_add_x, B_add_y, B_add_z, inver_MA2;
+    double gamma_, B_add_x, B_add_y, B_add_z, inver_MA2, hall_coef;
     double dt;
 
     // ========== Step driver ==========
@@ -183,6 +185,13 @@ private:
     void AssembleEdgeEMF_FromFaceE_Ideal_();
     void ApplyBC_EdgeEMF_();
     void AssembleFaceRHS_FromEdgeEMF_Curl_();
+// for Explicit Hall MHD
+#if HALL_MODE == 1
+    void ComputeJ_AtEdges_Inner_();
+    void ApplyBC_EdgeJ_();
+    void ComputeHallE_AtEdges_EnergyPreserving_(); // 生成 Ehall_xi/Ehall_eta/Ehall_zeta（标量线积分）
+    void AccumulateHallE_ToTotalEdgeEMF_();        // E_* += Ehall_*
+#endif
 
     // ========== Derived / diagnostics ==========
     void calc_PV();

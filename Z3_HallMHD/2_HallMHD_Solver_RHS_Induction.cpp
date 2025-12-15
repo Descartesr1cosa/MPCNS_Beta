@@ -1,11 +1,22 @@
 #include "HallMHD_Solver.h"
+#include "CTOperators.h"
 
 // 输入：E_face_xi/eta/zeta（已做完物理边界 + halo）
 // 输出：RHS_xi/eta/zeta（face 上的 dB/dt 项，CT curl）
 void HallMHDSolver::AssembleRHS_Induction()
 {
     // Calc RHS Terms For MHD induced Eqs
-    AssembleEdgeEMF_FromFaceE_Ideal_();  // 1) face E -> edge (E·dr)
+    AssembleEdgeEMF_FromFaceE_Ideal_(); // 1) face E -> edge (E·dr)
+
+#if (HALL_MODE == 1)
+    ComputeJ_AtEdges_Inner_();
+    ApplyBC_EdgeJ_();
+    ComputeHallE_AtEdges_EnergyPreserving_(); // 只填 Ehall_xi/eta/zeta（线积分量）
+    AccumulateHallE_ToTotalEdgeEMF_();        // E_edge += E_hall(B, rho_frozen)
+#elif (HALL_MODE == 2)
+    // 先留空：隐式 Hall 不走 RHS 叠加，而是后续单独 Solve(B) 修正
+#endif
+
     ApplyBC_EdgeEMF_();                  // 2) edge 的物理边界/极点修补 + halo
     AssembleFaceRHS_FromEdgeEMF_Curl_(); // 3) curl(edge EMF) -> RHS_face
 }
@@ -106,54 +117,14 @@ void HallMHDSolver::ApplyBC_EdgeEMF_()
 // curl E
 void HallMHDSolver::AssembleFaceRHS_FromEdgeEMF_Curl_()
 {
-    Int3 sub, sup;
-
-    // 计算RHS_xi
     for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)
     {
-        auto &RHS = fld_->field("RHS_xi", iblk);
+        auto &RHS_xi = fld_->field("RHS_xi", iblk);
+        auto &RHS_eta = fld_->field("RHS_eta", iblk);
+        auto &RHS_zeta = fld_->field("RHS_zeta", iblk);
+        auto &Exi = fld_->field("E_xi", iblk);
         auto &Eeta = fld_->field("E_eta", iblk);
         auto &Ezeta = fld_->field("E_zeta", iblk);
-        sub = RHS.inner_lo();
-        sup = RHS.inner_hi();
-        for (int i = sub.i; i < sup.i; i++)
-            for (int j = sub.j; j < sup.j; j++)
-                for (int k = sub.k; k < sup.k; k++)
-                {
-                    RHS(i, j, k, 0) -= (Eeta(i, j, k, 0) - Eeta(i, j, k + 1, 0));
-                    RHS(i, j, k, 0) -= (Ezeta(i, j + 1, k, 0) - Ezeta(i, j, k, 0));
-                }
-    }
-    // 计算RHS_eta
-    for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)
-    {
-        auto &RHS = fld_->field("RHS_eta", iblk);
-        auto &Exi = fld_->field("E_xi", iblk);
-        auto &Ezeta = fld_->field("E_zeta", iblk);
-        sub = RHS.inner_lo();
-        sup = RHS.inner_hi();
-        for (int i = sub.i; i < sup.i; i++)
-            for (int j = sub.j; j < sup.j; j++)
-                for (int k = sub.k; k < sup.k; k++)
-                {
-                    RHS(i, j, k, 0) -= (Exi(i, j, k + 1, 0) - Exi(i, j, k, 0));
-                    RHS(i, j, k, 0) -= (Ezeta(i, j, k, 0) - Ezeta(i + 1, j, k, 0));
-                }
-    }
-    // 计算RHS_zeta
-    for (int iblk = 0; iblk < fld_->num_blocks(); iblk++)
-    {
-        auto &RHS = fld_->field("RHS_zeta", iblk);
-        auto &Eeta = fld_->field("E_eta", iblk);
-        auto &Exi = fld_->field("E_xi", iblk);
-        sub = RHS.inner_lo();
-        sup = RHS.inner_hi();
-        for (int i = sub.i; i < sup.i; i++)
-            for (int j = sub.j; j < sup.j; j++)
-                for (int k = sub.k; k < sup.k; k++)
-                {
-                    RHS(i, j, k, 0) -= (Exi(i, j, k, 0) - Exi(i, j + 1, k, 0));
-                    RHS(i, j, k, 0) -= (Eeta(i + 1, j, k, 0) - Eeta(i, j, k, 0));
-                }
+        CTOperators::CurlEdgeToFace(iblk, Exi, Eeta, Ezeta, RHS_xi, RHS_eta, RHS_zeta, /*multiper=*/-1.0); // partial_t B = -curl E
     }
 }

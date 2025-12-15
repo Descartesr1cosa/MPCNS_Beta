@@ -378,3 +378,31 @@ void MHD_Boundary::apply_cell_wall_lunar(FieldBlock &U, FieldBlock &Bcell, Physi
                 }
             }
 }
+
+void MHD_Boundary::apply_edge_copy(FieldBlock &U, PhysicalRegion &patch)
+{
+    const FieldDescriptor &desc = U.descriptor();
+    const int ngh = desc.nghost;
+    const Int3 lo = patch.box_bound.lo;
+    const Int3 hi = patch.box_bound.hi;
+    const Int3 cyc = patch.cycle;
+    const int ncomp = desc.ncomp;
+
+    int32_t i, j, k;
+    for (int32_t ii = lo.i; ii < hi.i; ii++)
+        for (int32_t jj = lo.j; jj < hi.j; jj++)
+            for (int32_t kk = lo.k; kk < hi.k; kk++)
+            {
+                // ii jj kk在边界面上循环，属于计算网格范围
+                for (int32_t ng = 1; ng <= ngh; ng++)
+                {
+                    // i j k在虚网格上循环
+                    i = ii + ng * cyc.i;
+                    j = jj + ng * cyc.j;
+                    k = kk + ng * cyc.k;
+
+                    for (int m = 0; m < ncomp; ++m)
+                        U(i, j, k, m) = U(ii, jj, kk, m);
+                }
+            }
+}
