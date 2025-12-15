@@ -1,10 +1,8 @@
-#include "MHD_Solver.h"
+#include "HallMHD_Solver.h"
 
-void MHDSolver::time_advance()
+void HallMHDSolver::ZeroRHS()
 {
     //-----------------------------------------------------------------------------------------
-    // Step 1
-    //-----------------------------------------------------
     // RHS is initialized as 0.0
     for (int iblock = 0; iblock < fld_->num_blocks(); iblock++)
     {
@@ -54,17 +52,21 @@ void MHDSolver::time_advance()
         }
     }
     //-----------------------------------------------------
-    // Calc RHS Terms For Fluid Eqs
-    inv_fluid();
+}
 
+// 对 E_face_xi/eta/zeta 做 BC + halo同步
+void HallMHDSolver::SyncElectricFace()
+{
     std::vector<std::string> Electric_Face = {"E_face_xi", "E_face_eta", "E_face_zeta"};
     bound_.add_Face_boundary(Electric_Face);
     halo_->data_trans(Electric_Face[0]);
     halo_->data_trans(Electric_Face[1]);
     halo_->data_trans(Electric_Face[2]);
+}
 
-    // Calc RHS Terms For MHD induced Eqs
-    inv_induce();
+// 显式Euler推进
+void HallMHDSolver::ApplyTimeUpdate_Euler()
+{
     //-----------------------------------------------------
     // RK1 Time Advance
     for (int iblock = 0; iblock < fld_->num_blocks(); iblock++)
@@ -118,6 +120,10 @@ void MHDSolver::time_advance()
                         U(i, j, k, 0) += dt * RHS(i, j, k, 0);
         }
     }
+}
+
+void HallMHDSolver::Update_Physic_Time()
+{
     //-----------------------------------------------------
     // Update time
     control_.Physic_Time += dt;

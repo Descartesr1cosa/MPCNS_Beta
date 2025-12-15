@@ -1,5 +1,6 @@
-#include "MHD_Solver.h"
-void MHDSolver::compute_timestep()
+#include "HallMHD_Solver.h"
+
+void HallMHDSolver::Compute_Timestep()
 {
     if (control_.Time_step <= 0.0)
     {

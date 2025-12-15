@@ -1,5 +1,6 @@
-#include "MHD_Solver.h"
-void MHDSolver::calc_Residual()
+#include "HallMHD_Solver.h"
+
+void HallMHDSolver::Calc_Residual()
 {
     int ncomp = fld_->field("U_", 0).descriptor().ncomp;
     double temp;
