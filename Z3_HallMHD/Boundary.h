@@ -147,21 +147,22 @@ public:
     void add_Edge_pole_boundary(std::string field_name)
     {
         int32_t field_id = fld_->field_id(field_name);
+        auto patern = fld_->descriptor(field_id);
         for (auto &top : topo_->physical_patches)
         {
             if (top.bc_name == "Pole")
             {
                 const int ib = top.this_block;
                 FieldBlock &U = fld_->field(field_id, ib); // 该face上的 U
-                if (field_name == "E_zeta")
+                if (patern.location == StaggerLocation::EdgeZe)
                 {
                     continue; // 一定为0
                 }
-                else if (field_name == "E_xi" && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
+                else if (patern.location == StaggerLocation::EdgeXi && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
                 {
                     continue;
                 }
-                else if (field_name == "E_xi" && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
+                else if (patern.location == StaggerLocation::EdgeXi && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
                 {
                     double temp, count;
                     for (int i = top.this_box_node.lo.i; i < top.this_box_node.hi.i - 1; i++)
@@ -182,10 +183,10 @@ public:
 
                             // Unified
                             for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
-                                U(i, j, k, 0) = 2 * temp;
+                                U(i, j, k, 0) = temp;
                         }
                 }
-                else if (field_name == "E_eta" && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
+                else if (patern.location == StaggerLocation::EdgeEt && top.this_box_node.lo.i == top.this_box_node.hi.i - 1)
                 {
                     double temp, count;
                     for (int i = top.this_box_node.lo.i; i < top.this_box_node.hi.i; i++)
@@ -206,10 +207,10 @@ public:
 
                             // Unified
                             for (int k = top.this_box_node.lo.k; k < top.this_box_node.hi.k; k++)
-                                U(i, j, k, 0) = 2 * temp;
+                                U(i, j, k, 0) = temp;
                         }
                 }
-                else if (field_name == "E_eta" && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
+                else if (patern.location == StaggerLocation::EdgeEt && top.this_box_node.lo.j == top.this_box_node.hi.j - 1)
                 {
                     continue;
                 }

@@ -4,9 +4,9 @@
 void Field::build_geometry()
 {
     register_field(FieldDescriptor{"Jac", StaggerLocation::Cell, 1, 0});
-    register_field(FieldDescriptor{"JDxi", StaggerLocation::FaceXi, 3, 0});
-    register_field(FieldDescriptor{"JDet", StaggerLocation::FaceEt, 3, 0});
-    register_field(FieldDescriptor{"JDze", StaggerLocation::FaceZe, 3, 0});
+    register_field(FieldDescriptor{"JDxi", StaggerLocation::FaceXi, 3, 1});
+    register_field(FieldDescriptor{"JDet", StaggerLocation::FaceEt, 3, 1});
+    register_field(FieldDescriptor{"JDze", StaggerLocation::FaceZe, 3, 1});
 
     // --- NEW: covariant basis vectors at cell centers ---
     register_field(FieldDescriptor{"a_xi", StaggerLocation::Cell, 3, 0});
@@ -49,8 +49,10 @@ void Field::build_geometry()
             auto &y = grd->grids(ib).y;
             auto &z = grd->grids(ib).z;
 
-            Int3 inner_range_lo = data.inner_lo();
-            Int3 inner_range_hi = data.inner_hi();
+            // Int3 inner_range_lo = data.inner_lo();
+            // Int3 inner_range_hi = data.inner_hi();
+            Int3 inner_range_lo = data.get_lo();
+            Int3 inner_range_hi = data.get_hi();
             std::array<double, 3> ori, ori_xp, ori_yp, ori_xyp, rx, ry, rx_, ry_, Area;
             for (int i = inner_range_lo.i; i < inner_range_hi.i; i++)
                 for (int j = inner_range_lo.j; j < inner_range_hi.j; j++)
@@ -82,8 +84,10 @@ void Field::build_geometry()
             auto &y = grd->grids(ib).y;
             auto &z = grd->grids(ib).z;
 
-            Int3 inner_range_lo = data.inner_lo();
-            Int3 inner_range_hi = data.inner_hi();
+            // Int3 inner_range_lo = data.inner_lo();
+            // Int3 inner_range_hi = data.inner_hi();
+            Int3 inner_range_lo = data.get_lo();
+            Int3 inner_range_hi = data.get_hi();
             std::array<double, 3> ori, ori_xp, ori_yp, ori_xyp, rx, ry, rx_, ry_, Area;
             for (int i = inner_range_lo.i; i < inner_range_hi.i; i++)
                 for (int j = inner_range_lo.j; j < inner_range_hi.j; j++)
@@ -115,8 +119,10 @@ void Field::build_geometry()
             auto &y = grd->grids(ib).y;
             auto &z = grd->grids(ib).z;
 
-            Int3 inner_range_lo = data.inner_lo();
-            Int3 inner_range_hi = data.inner_hi();
+            // Int3 inner_range_lo = data.inner_lo();
+            // Int3 inner_range_hi = data.inner_hi();
+            Int3 inner_range_lo = data.get_lo();
+            Int3 inner_range_hi = data.get_hi();
             std::array<double, 3> ori, ori_xp, ori_yp, ori_xyp, rx, ry, rx_, ry_, Area;
             for (int i = inner_range_lo.i; i < inner_range_hi.i; i++)
                 for (int j = inner_range_lo.j; j < inner_range_hi.j; j++)
@@ -492,26 +498,26 @@ void Field::build_geometry()
                     for (int j = lo.j; j < hi.j; ++j)
                         for (int k = lo.k; k < hi.k; ++k)
                         {
-                            // need j-1, k-1 for symmetric stencils
-                            bool okA =
-                                in_range(loAe, hiAe, i, j, k) && in_range(loAe, hiAe, i, j, k - 1) &&
-                                in_range(loAz, hiAz, i, j, k) && in_range(loAz, hiAz, i, j - 1, k);
+                            // // need j-1, k-1 for symmetric stencils
+                            // bool okA =
+                            //     in_range(loAe, hiAe, i, j, k) && in_range(loAe, hiAe, i, j, k - 1) &&
+                            //     in_range(loAz, hiAz, i, j, k) && in_range(loAz, hiAz, i, j - 1, k);
 
-                            // 8-point xi-face average around edge
-                            for (int di : {0, 1})
-                                for (int dj : {0, -1})
-                                    for (int dk : {0, -1})
-                                        okA = okA && in_range(loAx, hiAx, i + di, j + dj, k + dk);
+                            // // 8-point xi-face average around edge
+                            // for (int di : {0, 1})
+                            //     for (int dj : {0, -1})
+                            //         for (int dk : {0, -1})
+                            //             okA = okA && in_range(loAx, hiAx, i + di, j + dj, k + dk);
 
-                            if (!okA)
-                            {
-                                for (int m = 0; m < 9; ++m)
-                                {
-                                    pinvGT(i, j, k, m) = 0.0;
-                                    pinvAT(i, j, k, m) = 0.0;
-                                }
-                                continue;
-                            }
+                            // if (!okA)
+                            // {
+                            //     for (int m = 0; m < 9; ++m)
+                            //     {
+                            //         pinvGT(i, j, k, m) = 0.0;
+                            //         pinvAT(i, j, k, m) = 0.0;
+                            //     }
+                            //     continue;
+                            // }
 
                             // G columns: g_xi, g_eta, g_zeta (all at the xi-edge center)
                             auto r000 = node(i, j, k);
@@ -567,26 +573,26 @@ void Field::build_geometry()
                     for (int j = lo.j; j < hi.j; ++j)
                         for (int k = lo.k; k < hi.k; ++k)
                         {
-                            // need i-1, k-1, and j+1 (edge direction)
-                            bool okA =
-                                in_range(loAx, hiAx, i, j, k) && in_range(loAx, hiAx, i, j, k - 1) &&
-                                in_range(loAz, hiAz, i, j, k) && in_range(loAz, hiAz, i - 1, j, k);
+                            // // need i-1, k-1, and j+1 (edge direction)
+                            // bool okA =
+                            //     in_range(loAx, hiAx, i, j, k) && in_range(loAx, hiAx, i, j, k - 1) &&
+                            //     in_range(loAz, hiAz, i, j, k) && in_range(loAz, hiAz, i - 1, j, k);
 
-                            // 8-point eta-face average around edge
-                            for (int di : {0, -1})
-                                for (int dj : {0, 1})
-                                    for (int dk : {0, -1})
-                                        okA = okA && in_range(loAe, hiAe, i + di, j + dj, k + dk);
+                            // // 8-point eta-face average around edge
+                            // for (int di : {0, -1})
+                            //     for (int dj : {0, 1})
+                            //         for (int dk : {0, -1})
+                            //             okA = okA && in_range(loAe, hiAe, i + di, j + dj, k + dk);
 
-                            if (!okA)
-                            {
-                                for (int m = 0; m < 9; ++m)
-                                {
-                                    pinvGT(i, j, k, m) = 0.0;
-                                    pinvAT(i, j, k, m) = 0.0;
-                                }
-                                continue;
-                            }
+                            // if (!okA)
+                            // {
+                            //     for (int m = 0; m < 9; ++m)
+                            //     {
+                            //         pinvGT(i, j, k, m) = 0.0;
+                            //         pinvAT(i, j, k, m) = 0.0;
+                            //     }
+                            //     continue;
+                            // }
 
                             auto r000 = node(i, j, k);
                             auto r010 = node(i, j + 1, k);
@@ -627,7 +633,6 @@ void Field::build_geometry()
                                 pinvAT(i, j, k, m) = pinvA[m];
                         }
             }
-
             // -------------------------
             // EdgeZe: pinvGT_ze / pinvAT_ze
             // -------------------------
@@ -641,26 +646,26 @@ void Field::build_geometry()
                     for (int j = lo.j; j < hi.j; ++j)
                         for (int k = lo.k; k < hi.k; ++k)
                         {
-                            // need i-1, j-1, and k+1 (edge direction)
-                            bool okA =
-                                in_range(loAx, hiAx, i, j, k) && in_range(loAx, hiAx, i, j - 1, k) &&
-                                in_range(loAe, hiAe, i, j, k) && in_range(loAe, hiAe, i - 1, j, k);
+                            // // need i-1, j-1, and k+1 (edge direction)
+                            // bool okA =
+                            //     in_range(loAx, hiAx, i, j, k) && in_range(loAx, hiAx, i, j - 1, k) &&
+                            //     in_range(loAe, hiAe, i, j, k) && in_range(loAe, hiAe, i - 1, j, k);
 
-                            // 8-point zeta-face average around edge
-                            for (int di : {0, -1})
-                                for (int dj : {0, -1})
-                                    for (int dk : {0, 1})
-                                        okA = okA && in_range(loAz, hiAz, i + di, j + dj, k + dk);
+                            // // 8-point zeta-face average around edge
+                            // for (int di : {0, -1})
+                            //     for (int dj : {0, -1})
+                            //         for (int dk : {0, 1})
+                            //             okA = okA && in_range(loAz, hiAz, i + di, j + dj, k + dk);
 
-                            if (!okA)
-                            {
-                                for (int m = 0; m < 9; ++m)
-                                {
-                                    pinvGT(i, j, k, m) = 0.0;
-                                    pinvAT(i, j, k, m) = 0.0;
-                                }
-                                continue;
-                            }
+                            // if (!okA)
+                            // {
+                            //     for (int m = 0; m < 9; ++m)
+                            //     {
+                            //         pinvGT(i, j, k, m) = 0.0;
+                            //         pinvAT(i, j, k, m) = 0.0;
+                            //     }
+                            //     continue;
+                            // }
 
                             auto r000 = node(i, j, k);
                             auto r001 = node(i, j, k + 1);
