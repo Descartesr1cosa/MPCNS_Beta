@@ -9,18 +9,21 @@
 #include "Initial.h"
 #include "HallConfig.h"
 
+#include "ImplicitHall_Solver.h"
+
 #include <array>
 
 class HallMHDSolver
 {
 public:
-    HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *halo, Param *par, std::vector<std::string> Solver_Name)
+    HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *halo, Param *par, ImplicitHall_Solver *hall_imp, std::vector<std::string> Solver_Name)
     {
         grd_ = grd;
         fld_ = fld;
         halo_ = halo;
         par_ = par;
         topo_ = topo;
+        hall_ = hall_imp;
 
         Solver_Name_ = Solver_Name;
 
@@ -54,17 +57,11 @@ public:
         fid_metric_[2] = fid_Zeta;
 
         gamma_ = par_->GetDou_List("constant").data["gamma"];
-
         B_add_x = par->GetDou("B_add_x");
         B_add_y = par->GetDou("B_add_y");
         B_add_z = par->GetDou("B_add_z");
-
         inver_MA2 = par->GetDou("inver_MA2");
         hall_coef = inver_MA2 * par->GetDou("phi");
-
-        control_.SetUp(par_, 8);
-        output_.SetUp(par_, fld_);
-        bound_.SetUp(grd_, fld_, topo_, par_);
 
         fld_->register_field(FieldDescriptor{"old_U_", StaggerLocation::Cell, 5, par->GetInt("ngg")});
         fld_->register_field(FieldDescriptor{"divB", StaggerLocation::Cell, 1, par->GetInt("ngg")});
@@ -75,6 +72,23 @@ public:
         fld_->register_field(FieldDescriptor{"RHS_xi", StaggerLocation::FaceXi, 1, par->GetInt("ngg")});
         fld_->register_field(FieldDescriptor{"RHS_eta", StaggerLocation::FaceEt, 1, par->GetInt("ngg")});
         fld_->register_field(FieldDescriptor{"RHS_zeta", StaggerLocation::FaceZe, 1, par->GetInt("ngg")});
+        fld_->register_field(FieldDescriptor{"RHShall_xi", StaggerLocation::FaceXi, 1, par->GetInt("ngg")});
+        fld_->register_field(FieldDescriptor{"RHShall_eta", StaggerLocation::FaceEt, 1, par->GetInt("ngg")});
+        fld_->register_field(FieldDescriptor{"RHShall_zeta", StaggerLocation::FaceZe, 1, par->GetInt("ngg")});
+
+        control_.SetUp(par_, 8);
+        output_.SetUp(par_, fld_);
+        bound_.SetUp(grd_, fld_, topo_, par_);
+
+        //=============================================================================================
+#if HALL_MODE == 2
+        if (hall_)
+        {
+            hall_->setup(grd_, topo_, fld_, halo_, par_, &bound_);
+            hall_->set_rhshall_callback(&HallMHDSolver::RHShallCallback_, this);
+        }
+#endif
+        //=============================================================================================
     }
 
     void Advance()
@@ -96,6 +110,7 @@ private:
     Field *fld_;
     Halo *halo_;
     Param *par_;
+    ImplicitHall_Solver *hall_;
 
     // --- components ---
     MHD_Control control_;
@@ -120,6 +135,11 @@ private:
     {
         Compute_Timestep();
         Time_Advance(); // 内部只编排：ZeroRHS/Assemble/Update
+
+        SyncForSubstep_NoSnapshot(); // 把 * 步状态同步到一致（但不要 SnapshotOldFields）
+#if HALL_MODE == 2
+        hall_->solve_implicit_hall(dt);
+#endif
         Calc_Residual();
         PrepareStep(); // 用于下一步/输出前字段一致
         return UpdateControlAndOutput();
@@ -139,6 +159,15 @@ private:
         UpdateDerivedPVandDivB(); // PV + divB
         SnapshotOldFields();      // old_* for residual/monitor
     };
+
+    void SyncForSubstep_NoSnapshot()
+    {
+        SyncPrimaryFaceB();       // B_face: BC + halo
+        ComputeBcellInner();      // B_cell: inner compute
+        SyncDerivedBcell();       // B_cell: derived BC + halo (+corner)
+        SyncPrimaryCellU();       // U: BC + halo (+corner)
+        UpdateDerivedPVandDivB(); // PV + divB
+    }
 
     void SyncPrimaryFaceB();       // B_face_*（ghost）
     void ComputeBcellInner();      // 在 inner 域从 B_face_* 重建 cell 磁场。
@@ -247,4 +276,18 @@ private:
             vector[2] = c;
         }
     };
+
+// ========== For Hall MHD Implicit Solver ==========
+#if HALL_MODE == 2
+private:
+    // 真正干活的成员函数：计算 RHShall_*（写入 face fields）
+    void ComputeRHShallFromCurrentBface_();
+
+    // 静态 wrapper：签名匹配 void(*)(void*)
+    static void RHShallCallback_(void *ctx)
+    {
+        auto *self = static_cast<HallMHDSolver *>(ctx);
+        self->ComputeRHShallFromCurrentBface_();
+    }
+#endif
 };

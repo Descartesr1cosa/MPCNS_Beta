@@ -2,6 +2,32 @@ cmake_minimum_required(VERSION 3.5)
 project(MPCNS_HallMHD)
 set(CMAKE_CXX_STANDARD 20)
 
+
+# 从环境变量里读 PETSC_DIR / PETSC_ARCH
+if(NOT DEFINED ENV{PETSC_DIR})
+    message(FATAL_ERROR "环境变量 PETSC_DIR 没设，例如 export PETSC_DIR=/home/Descartes/tmp_petsc/petsc")
+endif()
+
+if(NOT DEFINED ENV{PETSC_ARCH})
+    message(FATAL_ERROR "环境变量 PETSC_ARCH 没设，例如 export PETSC_ARCH=arch-mswin-c-debug 或 arch-mswin-c-opt")
+endif()
+
+set(PETSC_DIR  $ENV{PETSC_DIR})
+set(PETSC_ARCH $ENV{PETSC_ARCH})
+
+message(STATUS "Using PETSc from: ${PETSC_DIR}")
+message(STATUS "Using PETSc arch: ${PETSC_ARCH}")
+
+# PETSc 头文件
+include_directories(
+    "${PETSC_DIR}/include"
+    "${PETSC_DIR}/${PETSC_ARCH}/include"
+)
+
+# PETSc 库目录
+link_directories("${PETSC_DIR}/${PETSC_ARCH}/lib")
+
+
 # Find MPI
 find_package(MPI REQUIRED)
 
@@ -33,4 +59,6 @@ add_executable(MPCNS_HallMHD main.cpp ${DIRSRCS0} ${DIRSRCS1} ${DIRSRCS2} ${DIRS
 #target_compile_options(MPCNS_HallMHD PRIVATE -std=c++20 -fconcepts)
 
 # add the mpi linkings
-target_link_libraries(MPCNS_HallMHD ${MPI_LIBRARIES} stdc++fs)
+target_link_libraries(MPCNS_HallMHD PRIVATE
+    petsc     openblas
+${MPI_LIBRARIES} stdc++fs)

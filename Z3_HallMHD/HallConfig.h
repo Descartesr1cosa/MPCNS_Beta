@@ -1,7 +1,7 @@
 // HallConfig.h
 #pragma once
 
-#define HALL_MODE 1
+#define HALL_MODE 2
 
 #ifndef HALL_MODE
 #define HALL_MODE 0 // 0: Ideal MHD, 1: Explicit Hall, 2: Implicit Hall
