@@ -138,10 +138,28 @@ private:
 
 #if HALL_MODE == 2
         SyncForSubstep_NoSnapshot(); // 把 * 步状态同步到一致（但不要 SnapshotOldFields）
+
+        // const double Eb_star = MagneticEnergyInner_();
+
         hall_->solve_implicit_hall(dt);
-#endif
+
+        // ComputeBcellInner(); // 关键：用新 B_face 重建 inner B_cell
+        // const double Eb_new = MagneticEnergyInner_();
+        // if (par_->GetInt("myid") == 0 && fmod(par_->GetInt("Nstep"), 100) == 0)
+        // { // 你按自己项目里的rank变量写
+        //     const double dEb = Eb_new - Eb_star;
+        //     const double rel = dEb / (std::abs(Eb_star) + 1e-300);
+        //     printf("[HallEb] Eb*=%.16e  Eb_new=%.16e  dEb=%+.3e  rel=%+.3e\n",
+        //            Eb_star, Eb_new, dEb, rel);
+        // }
+
+        Modify_TotalEnergy_AfterHall(); // 根据新的磁场修正
+        Calc_Residual();
+        SnapshotOldFields(); // old_* for residual/monitor, 用于下一步/输出前字段一致
+#else
         Calc_Residual();
         PrepareStep(); // 用于下一步/输出前字段一致
+#endif
         return UpdateControlAndOutput();
     };
 
@@ -300,5 +318,38 @@ private:
     // tools
     void ZeroRHShall();
     void AssembleFaceRHSHall_FromEdgeHallEMF_Curl_();
+    void Modify_TotalEnergy_AfterHall();
+    void UpdateTotalEnergy();
+
+    // double MagneticEnergyInner_() const
+    // {
+    //     double local = 0.0;
+
+    //     for (int ib = 0; ib < fld_->grd->nblock; ++ib)
+    //     {
+    //         FieldBlock &B = fld_->field(fid_Bcell, ib);
+    //         FieldBlock &J = fld_->field(fid_Jac, ib); // 若你不想用Jac，可先不取
+
+    //         auto lo = B.inner_lo();
+    //         auto hi = B.inner_hi();
+
+    //         for (int k = lo.k; k < hi.k; ++k)
+    //             for (int j = lo.j; j < hi.j; ++j)
+    //                 for (int i = lo.i; i < hi.i; ++i)
+    //                 {
+    //                     const double bx = B(i, j, k, 0);
+    //                     const double by = B(i, j, k, 1);
+    //                     const double bz = B(i, j, k, 2);
+    //                     const double B2 = bx * bx + by * by + bz * bz;
+
+    //                     const double dV = J(i, j, k, 0); // 若不确定Jac，可改成1.0
+    //                     local += 0.5 * inver_MA2 * B2 * dV;
+    //                 }
+    //     }
+
+    //     double global = 0.0;
+    //     MPI_Allreduce(&local, &global, 1, MPI_DOUBLE, MPI_SUM, PETSC_COMM_WORLD);
+    //     return global;
+    // }
 #endif
 };

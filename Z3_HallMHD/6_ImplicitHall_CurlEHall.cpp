@@ -75,3 +75,51 @@ void HallMHDSolver::AssembleFaceRHSHall_FromEdgeHallEMF_Curl_()
         CTOperators::CurlEdgeToFace(iblk, Exi, Eeta, Ezeta, RHS_xi, RHS_eta, RHS_zeta, /*multiper=*/1.0); // curl E
     }
 }
+
+void HallMHDSolver::Modify_TotalEnergy_AfterHall()
+{
+    // 之前已经计算了U_ PV_,Hall只修改了B
+    // 因此需要更新B_cell 然后把U_的能量修改即可，无需（也不能）更新PV
+    SyncPrimaryFaceB();  // B_face: BC + halo
+    ComputeBcellInner(); // B_cell: inner compute
+    SyncDerivedBcell();  // B_cell: derived BC + halo (+corner)
+    UpdateTotalEnergy(); // using B_cell and PV --> U
+    SyncPrimaryCellU();  // U: BC + halo (+corner)
+    calc_divB();         // divB
+}
+
+void HallMHDSolver::UpdateTotalEnergy()
+{
+    const int nblock = fld_->num_blocks();
+
+    for (int ib = 0; ib < nblock; ++ib)
+    {
+        auto &U = fld_->field(fid_U, ib);
+        auto &PV = fld_->field(fid_PV, ib);
+        auto &Bcell = fld_->field(fid_Bcell, ib);
+
+        Int3 lo = U.get_lo();
+        Int3 hi = U.get_hi();
+
+        for (int i = lo.i; i < hi.i; ++i)
+            for (int j = lo.j; j < hi.j; ++j)
+                for (int k = lo.k; k < hi.k; ++k)
+                {
+                    double rho = U(i, j, k, 0);
+                    double u = PV(i, j, k, 0);
+                    double v = PV(i, j, k, 1);
+                    double w = PV(i, j, k, 2);
+                    double p = PV(i, j, k, 3);
+
+                    double kin = 0.5 * rho * (u * u + v * v + w * w);
+
+                    double Bx = Bcell(i, j, k, 0);
+                    double By = Bcell(i, j, k, 1);
+                    double Bz = Bcell(i, j, k, 2);
+                    double B2 = Bx * Bx + By * By + Bz * Bz;
+                    double E_mag = 0.5 * B2 * inver_MA2; //  磁场能量 new
+
+                    U(i, j, k, 4) = kin + p / (gamma_ - 1.0) + E_mag; //  MHD 总能量 new
+                }
+    }
+}
