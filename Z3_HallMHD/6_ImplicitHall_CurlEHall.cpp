@@ -1,6 +1,6 @@
 #include "HallMHD_Solver.h"
 #include "CTOperators.h"
-
+#if HALL_MODE == 2
 // 这里只实现ComputeRHShallFromCurrentBface_： 求解curl E_hall，这将作为函数指针传入ImplicitHall_Sovler中调用
 // 从而实现隐式迭代求解
 void HallMHDSolver::ComputeRHShallFromCurrentBface_()
@@ -135,3 +135,5 @@ void HallMHDSolver::ApplyBC_EdgeHallEMF_()
     // halo_->data_trans("Ehall_eta");
     // halo_->data_trans("Ehall_zeta");
 }
+
+#endif
