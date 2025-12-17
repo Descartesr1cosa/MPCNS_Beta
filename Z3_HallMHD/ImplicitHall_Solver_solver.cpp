@@ -81,7 +81,7 @@ PetscErrorCode ImplicitHall_Solver::FormFunction_(Vec X, Vec F)
     //     SETERRQ(PETSC_COMM_WORLD, PETSC_ERR_ARG_NULL, "RHShall callback not set.");
     rhshall_cb_(rhshall_ctx_);
 
-    // 3) 组装 VecF：F_lid = X_lid - Xref_lid - dt * RHShall(dof)
+    // 3) 组装 VecF：F_lid = X_lid - Xref_lid + dt * RHShall(dof)
     const PetscScalar *x = nullptr, *xref = nullptr;
     PetscScalar *f = nullptr;
     VecGetArrayRead(X, &x);
