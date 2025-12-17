@@ -354,4 +354,5 @@ private:
     //     return global;
     // }
 #endif
+    void PrintMinMaxDiagnostics_();
 };
