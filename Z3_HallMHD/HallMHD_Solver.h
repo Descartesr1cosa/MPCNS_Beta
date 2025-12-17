@@ -320,6 +320,8 @@ private:
     void AssembleFaceRHSHall_FromEdgeHallEMF_Curl_();
     void Modify_TotalEnergy_AfterHall();
     void UpdateTotalEnergy();
+    // Eelectric  edge Boundary
+    void ApplyBC_EdgeHallEMF_();
 
     // double MagneticEnergyInner_() const
     // {

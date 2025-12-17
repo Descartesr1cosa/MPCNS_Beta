@@ -15,8 +15,8 @@ void HallMHDSolver::ComputeRHShallFromCurrentBface_()
     ApplyBC_EdgeJ_();
 
     // 3) 用 J_edge 和 B 计算 Ehall_edge
-    ComputeHallE_AtEdges_EnergyPreserving_();  // 只填 Ehall_xi/eta/zeta（线积分量）
-    bound_.add_Edge_pole_boundary("Ehall_xi"); //   edge 的物理边界/极点修补 + halo
+    ComputeHallE_AtEdges_EnergyPreserving_(); // 只填 Ehall_xi/eta/zeta（线积分量）
+    ApplyBC_EdgeHallEMF_();                   //   edge 的物理边界/极点修补 + halo
 
     // 4) curl(Ehall_edge) -> RHShall_face
     AssembleFaceRHSHall_FromEdgeHallEMF_Curl_();
@@ -122,4 +122,16 @@ void HallMHDSolver::UpdateTotalEnergy()
                     U(i, j, k, 4) = kin + p / (gamma_ - 1.0) + E_mag; //  MHD 总能量 new
                 }
     }
+}
+
+void HallMHDSolver::ApplyBC_EdgeHallEMF_()
+{
+    // 后续CT只会用到inner的电场，不会使用nghost区域，因此只需对Pole处理即可
+    bound_.add_Edge_pole_boundary("Ehall_xi"); // pole边界处理
+    bound_.add_Edge_pole_boundary("Ehall_eta");
+    // bound_.add_Edge_pole_boundary("Ehall_zeta");
+
+    // halo_->data_trans("Ehall_xi");
+    // halo_->data_trans("Ehall_eta");
+    // halo_->data_trans("Ehall_zeta");
 }
