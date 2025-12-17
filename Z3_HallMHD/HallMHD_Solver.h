@@ -136,8 +136,8 @@ private:
         Compute_Timestep();
         Time_Advance(); // 内部只编排：ZeroRHS/Assemble/Update
 
-        SyncForSubstep_NoSnapshot(); // 把 * 步状态同步到一致（但不要 SnapshotOldFields）
 #if HALL_MODE == 2
+        SyncForSubstep_NoSnapshot(); // 把 * 步状态同步到一致（但不要 SnapshotOldFields）
         hall_->solve_implicit_hall(dt);
 #endif
         Calc_Residual();
@@ -215,11 +215,17 @@ private:
     void ApplyBC_EdgeEMF_();
     void AssembleFaceRHS_FromEdgeEMF_Curl_();
 // for Explicit Hall MHD
-#if HALL_MODE == 1
+#if HALL_MODE != 0
     void ComputeJ_AtEdges_Inner_();
     void ApplyBC_EdgeJ_();
     void ComputeHallE_AtEdges_EnergyPreserving_(); // 生成 Ehall_xi/Ehall_eta/Ehall_zeta（标量线积分）
-    void AccumulateHallE_ToTotalEdgeEMF_();        // E_* += Ehall_*
+    // void AccumulateHallE_ToTotalEdgeEMF_();        // E_* += Ehall_*
+#endif
+#if HALL_MODE == 1
+    // void ComputeJ_AtEdges_Inner_();
+    // void ApplyBC_EdgeJ_();
+    // void ComputeHallE_AtEdges_EnergyPreserving_(); // 生成 Ehall_xi/Ehall_eta/Ehall_zeta（标量线积分）
+    void AccumulateHallE_ToTotalEdgeEMF_(); // E_* += Ehall_*
 #endif
 
     // ========== Derived / diagnostics ==========
@@ -277,7 +283,7 @@ private:
         }
     };
 
-// ========== For Hall MHD Implicit Solver ==========
+    // ========== For Hall MHD Implicit Solver ==========
 #if HALL_MODE == 2
 private:
     // 真正干活的成员函数：计算 RHShall_*（写入 face fields）
@@ -289,5 +295,10 @@ private:
         auto *self = static_cast<HallMHDSolver *>(ctx);
         self->ComputeRHShallFromCurrentBface_();
     }
+
+    //------------------------------------
+    // tools
+    void ZeroRHShall();
+    void AssembleFaceRHSHall_FromEdgeHallEMF_Curl_();
 #endif
 };

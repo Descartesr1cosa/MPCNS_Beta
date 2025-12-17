@@ -1,7 +1,7 @@
 #include "HallMHD_Solver.h"
 #include "CTOperators.h"
 
-#if HALL_MODE == 1
+#if HALL_MODE != 0
 
 void HallMHDSolver::ComputeJ_AtEdges_Inner_()
 {
@@ -269,7 +269,9 @@ void HallMHDSolver::ComputeHallE_AtEdges_EnergyPreserving_()
     }
 #endif
 }
+#endif
 
+#if HALL_MODE == 1
 // E_* += Ehall_*
 void HallMHDSolver::AccumulateHallE_ToTotalEdgeEMF_()
 {

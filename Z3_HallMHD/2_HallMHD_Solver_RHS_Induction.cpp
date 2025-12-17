@@ -13,8 +13,6 @@ void HallMHDSolver::AssembleRHS_Induction()
     ApplyBC_EdgeJ_();
     ComputeHallE_AtEdges_EnergyPreserving_(); // 只填 Ehall_xi/eta/zeta（线积分量）
     AccumulateHallE_ToTotalEdgeEMF_();        // E_edge += E_hall(B, rho_frozen)
-#elif (HALL_MODE == 2)
-    // 先留空：隐式 Hall 不走 RHS 叠加，而是后续单独 Solve(B) 修正
 #endif
 
     ApplyBC_EdgeEMF_();                  // 2) edge 的物理边界/极点修补 + halo
