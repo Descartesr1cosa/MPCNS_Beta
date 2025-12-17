@@ -82,8 +82,9 @@ public:
             start = end;
             //----------------------------------------------------------------------------
             std::cout << "Nstep=" << std::setw(10) << Nstep << "\tPhysicTime=" << std::setw(10) << std::setprecision(5) << Physic_Time
-                      << "\tError=" << std::setw(10) << std::setprecision(5) << residual_max
-                      << "\tCPU_Time=" << std::setw(10) << std::setprecision(5) << cpu_time << std::endl;
+                      << "\t\tCPU_Time=" << std::setw(28) << std::setprecision(5) << cpu_time << std::endl;
+            //   << "\tError=" << std::setw(10) << std::setprecision(5) << residual_max
+            // << "\tCPU_Time=" << std::setw(10) << std::setprecision(5) << cpu_time << std::endl;
         }
         //=========================================================================================
 

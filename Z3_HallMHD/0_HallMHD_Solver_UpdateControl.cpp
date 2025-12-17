@@ -94,35 +94,42 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     double divb_absmax_g;
 
     PARALLEL::mpi_barrier();
-    MPI_Allreduce(&rho_min_l, &rho_min_g, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(&rho_max_l, &rho_max_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
-    MPI_Allreduce(&p_min_l, &p_min_g, 1, MPI_DOUBLE, MPI_MIN, PETSC_COMM_WORLD);
-    MPI_Allreduce(&p_max_l, &p_max_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
 
-    MPI_Allreduce(&bx_min_l, &bx_min_g, 1, MPI_DOUBLE, MPI_MIN, PETSC_COMM_WORLD);
-    MPI_Allreduce(&bx_max_l, &bx_max_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
-    MPI_Allreduce(&by_min_l, &by_min_g, 1, MPI_DOUBLE, MPI_MIN, PETSC_COMM_WORLD);
-    MPI_Allreduce(&by_max_l, &by_max_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
-    MPI_Allreduce(&bz_min_l, &bz_min_g, 1, MPI_DOUBLE, MPI_MIN, PETSC_COMM_WORLD);
-    MPI_Allreduce(&bz_max_l, &bz_max_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
+    double mins_l[6] = {rho_min_l, p_min_l, bx_min_l, by_min_l, bz_min_l, bmag_min_l};
+    double mins_g[6];
+    double maxs_l[7] = {rho_max_l, p_max_l, bx_max_l, by_max_l, bz_max_l, bmag_max_l, divb_absmax_l};
+    double maxs_g[7];
 
-    MPI_Allreduce(&bmag_min_l, &bmag_min_g, 1, MPI_DOUBLE, MPI_MIN, PETSC_COMM_WORLD);
-    MPI_Allreduce(&bmag_max_l, &bmag_max_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
+    PARALLEL::mpi_min(mins_l, mins_g, 6);
+    PARALLEL::mpi_max(maxs_l, maxs_g, 7);
 
-    MPI_Allreduce(&divb_absmax_l, &divb_absmax_g, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
+    // 解包
+    rho_min_g = mins_g[0];
+    p_min_g = mins_g[1];
+    bx_min_g = mins_g[2];
+    by_min_g = mins_g[3];
+    bz_min_g = mins_g[4];
+    bmag_min_g = mins_g[5];
+
+    rho_max_g = maxs_g[0];
+    p_max_g = maxs_g[1];
+    bx_max_g = maxs_g[2];
+    by_max_g = maxs_g[3];
+    bz_max_g = maxs_g[4];
+    bmag_max_g = maxs_g[5];
+    divb_absmax_g = maxs_g[6];
 
     // --- print on rank 0 only ---
     if (myid == 0)
     {
         std::printf(
-            "\t\trho      =[%.6e, %.6e]\n"
-            "\t\tp        =[%.6e, %.6e]\n"
-            "\t\tBmag     =[%.6e, %.6e]\n"
-            "\t\tBx       =[%.6e, %.6e]\tBy  =[%.6e, %.6e]\tBz  =[%.6e, %.6e]\n"
-            "\t\tmax|divB|=%.6e\n\n",
+            "\t\trho   =[%.6e, %.6e]\tp        =[%.6e, %.6e]\n"
+            "\t\tBmag  =[%.6e, %.6e]\tmax|divB|=[%26.6e]\n"
+            "\t\tBx    =[%.6e, %.6e]\tBy       =[%.6e, %.6e]\tBz  =[%.6e, %.6e]\n",
             rho_min_g, rho_max_g, p_min_g, p_max_g,
-            bmag_min_g, bmag_max_g,
-            bx_min_g, bx_max_g, by_min_g, by_max_g, bz_min_g, bz_max_g,
-            divb_absmax_g);
+            bmag_min_g, bmag_max_g, divb_absmax_g,
+            bx_min_g, bx_max_g, by_min_g, by_max_g, bz_min_g, bz_max_g);
+        std::cout << std::endl
+                  << std::flush;
     }
 }
