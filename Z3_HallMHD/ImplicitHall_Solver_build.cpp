@@ -43,7 +43,7 @@ void ImplicitHall_Solver::apply_physical_bc_mask_()
             continue;
 
         // topo_里面的范围是基于node的，这里会自动处理为对应的范围
-        mark_face_patch_(p.this_block, p.this_box_node, axis, (PetscInt)0);
+        mark_face_patch_(p.this_block, p.this_box_node, axis, (PetscInt)1);
     }
 }
 
