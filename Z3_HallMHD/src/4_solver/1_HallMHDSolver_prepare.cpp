@@ -1,4 +1,38 @@
+// Core
+#include "1_grid/1_MPCNS_Grid.h"
+#include "2_topology/2_MPCNS_Topology.h"
+#include "3_field/2_MPCNS_Field.h"
+#include "3_field/3_MPCNS_Halo.h"
+
+// Z3_HallMHD
 #include "HallMHD_Solver.h"
+
+//=========================================================================
+//-------------------------------------------------------------------------
+//=========================================================================
+
+void HallMHDSolver::PrepareStep()
+{
+    SyncPrimaryFaceB();       // B_face: BC + halo
+    ComputeBcellInner();      // B_cell: inner compute
+    SyncDerivedBcell();       // B_cell: derived BC + halo (+corner)
+    SyncPrimaryCellU();       // U: BC + halo (+corner)
+    UpdateDerivedPVandDivB(); // PV + divB
+    SnapshotOldFields();      // old_* for residual/monitor
+}
+
+void HallMHDSolver::PrepareSubstep_NoSnapshot()
+{
+    SyncPrimaryFaceB();       // B_face: BC + halo
+    ComputeBcellInner();      // B_cell: inner compute
+    SyncDerivedBcell();       // B_cell: derived BC + halo (+corner)
+    SyncPrimaryCellU();       // U: BC + halo (+corner)
+    UpdateDerivedPVandDivB(); // PV + divB
+}
+
+//=========================================================================
+//-------------------------------------------------------------------------
+//=========================================================================
 
 // 目的：让所有用到B_face的地方都不再思考halo
 // 输入：B_face_*（本地可能已更新）

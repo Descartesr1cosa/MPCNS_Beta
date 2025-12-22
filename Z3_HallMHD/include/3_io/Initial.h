@@ -1,5 +1,8 @@
 #pragma once
+
 #include "3_field/2_MPCNS_Field.h"
+
+#include "3_io/Dipole.h"
 
 class MHD_Initial
 {
@@ -56,11 +59,24 @@ public:
 
             // 把无量纲 M_A^(-2)加入par便于调用
             par->AddParam("inver_MA2", 1.0 / (M_A * M_A));
+
+            // 为了统一，这里总能减去磁场能量，实际是由压力、速度、密度重算能量
+            Compute_Fluid_Energy(fld);
         }
         else
         {
+            // Bcell Bface(induction) Eedge =0
+            // 为了统一，这里总能只有流体能量
             Common_Initial(fld);
         }
+
+        int fid_Badd_xi = fld->field_id("Badd_xi");
+        int fid_Badd_eta = fld->field_id("Badd_eta");
+        int fid_Badd_zeta = fld->field_id("Badd_zeta");
+        DipoleField dip_field;
+        dip_field.load_from_param(par);
+        dip_field.Build_Badd_FaceFlux(fld->grd, fld, par, fid_Badd_xi, fid_Badd_eta, fid_Badd_zeta);
+        // 此时总能量有待更新 只有流体能量
 
         if (par->GetInt("myid") == 0)
         {
@@ -143,21 +159,17 @@ public:
         double p0 = p_ref / (rho_ref * U_ref * U_ref);
 
         // 外加磁场对应的无量纲磁能密度
-        double B2 = Bx * Bx + By * By + Bz * Bz;
-        double Emag0 = 0.5 * B2 / (M_A * M_A);
+        // double B2 = Bx * Bx + By * By + Bz * Bz;
+        // double Emag0 = 0.5 * B2 / (M_A * M_A);
 
         // ---- 填充 U_initial ----
         U_initial(0) = rho0;
         U_initial(1) = rho0 * u0;
         U_initial(2) = rho0 * v0;
         U_initial(3) = rho0 * w0;
-        U_initial(4) = 0.5 * rho0 * v2      // 动能
-                       + p0 / (gamma - 1.0) // 内能
-                       + Emag0;             // 总磁场（这里只是 B_add）的能量
-
-        // 感应磁场一律从 0 开始：
-        //   B_ind = 0  ->  B_total = B_add
-        //   具体 Face 上的 B_ind 下面在 Common_Initial 里设。
+        U_initial(4) = 0.5 * rho0 * v2       // 动能
+                       + p0 / (gamma - 1.0); // 内能
+                                             //    + Emag0;             // 总磁场（这里只是 B_add）的能量
     };
 
 public:
@@ -165,6 +177,36 @@ public:
     ~MHD_Initial() = default;
 
 private:
+    void Compute_Fluid_Energy(Field *fld_)
+    {
+        double gamma = fld_->par->GetDou_List("constant").data["gamma"];
+
+        const int nblock = fld_->num_blocks();
+
+        for (int ib = 0; ib < nblock; ++ib)
+        {
+            auto &U = fld_->field("U_", ib);
+            auto &PV = fld_->field("PV_", ib);
+
+            Int3 lo = U.get_lo();
+            Int3 hi = U.get_hi();
+
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        double rho = U(i, j, k, 0);
+                        double u = U(i, j, k, 1) / rho;
+                        double v = U(i, j, k, 2) / rho;
+                        double w = U(i, j, k, 3) / rho;
+                        double kin = 0.5 * rho * (u * u + v * v + w * w);
+                        double E_inner = PV(i, j, k, 3) / (gamma - 1.0);
+
+                        U(i, j, k, 4) = E_inner + kin; // 这里只存储流体能量
+                    }
+        }
+    }
+
     void Common_Initial(Field *fld)
     {
         Param *par = fld->par;
@@ -201,9 +243,9 @@ private:
                     {
                         for (int32_t ll = 0; ll < desc.ncomp; ll++)
                             Ublk(i, j, k, ll) = uinitial(ll);
-                        B_cell(i, j, k, 0) = Bx;
-                        B_cell(i, j, k, 1) = By;
-                        B_cell(i, j, k, 2) = Bz;
+                        B_cell(i, j, k, 0) = 0.0;
+                        B_cell(i, j, k, 1) = 0.0;
+                        B_cell(i, j, k, 2) = 0.0;
                     }
         }
 
@@ -249,40 +291,6 @@ private:
                         for (int k = lo.k; k < hi.k; ++k)
                             Bze_blk(i, j, k, 0) = 0.0;
             }
-
-            // // --- FaceXi 上的感应 B^ξ ---
-            // {
-            //     FieldBlock &Bxi_blk = fld->field(fid_Bxi, iblock);
-            //     FieldBlock &xi = fld->field("JDxi", iblock);
-            //     const Int3 &lo = Bxi_blk.inner_lo();
-            //     const Int3 &hi = Bxi_blk.inner_hi();
-            //     for (int i = lo.i; i < hi.i; ++i)
-            //         for (int j = lo.j; j < hi.j; ++j)
-            //             for (int k = lo.k; k < hi.k; ++k)
-            //                 Bxi_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2); // 感应场从 0 开始
-            // }
-            // // --- FaceEt 上的感应 B^η ---
-            // {
-            //     FieldBlock &Beta_blk = fld->field(fid_Beta, iblock);
-            //     FieldBlock &xi = fld->field("JDet", iblock);
-            //     const Int3 &lo = Beta_blk.inner_lo();
-            //     const Int3 &hi = Beta_blk.inner_hi();
-            //     for (int i = lo.i; i < hi.i; ++i)
-            //         for (int j = lo.j; j < hi.j; ++j)
-            //             for (int k = lo.k; k < hi.k; ++k)
-            //                 Beta_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2);
-            // }
-            // // --- FaceZe 上的感应 B^ζ ---
-            // {
-            //     FieldBlock &Bze_blk = fld->field(fid_Bze, iblock);
-            //     FieldBlock &xi = fld->field("JDze", iblock);
-            //     const Int3 &lo = Bze_blk.inner_lo();
-            //     const Int3 &hi = Bze_blk.inner_hi();
-            //     for (int i = lo.i; i < hi.i; ++i)
-            //         for (int j = lo.j; j < hi.j; ++j)
-            //             for (int k = lo.k; k < hi.k; ++k)
-            //                 Bze_blk(i, j, k, 0) = Bx * xi(i, j, k, 0) + By * xi(i, j, k, 1) + Bz * xi(i, j, k, 2);
-            // }
 
             // --- Edge 上的 EMF 也设零（可选，但推荐） ---
             {

@@ -9,7 +9,9 @@
 #include "2_topology/2_MPCNS_Topology.h"
 #include "3_field/2_MPCNS_Field.h"
 #include "3_field/3_MPCNS_Halo.h"
+
 #include "HallMHD_Solver.h"
+#include "4_solver/ImplicitHall_Solver.h"
 //==============================================================================
 
 //==============================================================================
@@ -54,50 +56,62 @@ int main(int arg, char **argv)
     int ngg = par->GetInt("ngg");
     // 守恒变量、独立变量，用于构建CT方法
     fld->register_field({"U_", StaggerLocation::Cell, 5, ngg});
-    fld->register_field({"B_xi", StaggerLocation::FaceXi, 1, ngg});
-    fld->register_field({"B_eta", StaggerLocation::FaceEt, 1, ngg});
-    fld->register_field({"B_zeta", StaggerLocation::FaceZe, 1, ngg});
+    fld->register_field({"B_xi", StaggerLocation::FaceXi, 1, 1});   // 用于CT方法，只需要1层虚网格
+    fld->register_field({"B_eta", StaggerLocation::FaceEt, 1, 1});  // 用于CT方法，只需要1层虚网格
+    fld->register_field({"B_zeta", StaggerLocation::FaceZe, 1, 1}); // 用于CT方法，只需要1层虚网格
+
+    // 辅助物理场
+    fld->register_field(FieldDescriptor{"PV_", StaggerLocation::Cell, 4, ngg}); // 原始变量
+    fld->register_field({"B_cell", StaggerLocation::Cell, 3, ngg});             // 辅助磁场
+    fld->register_field({"Badd_xi", StaggerLocation::FaceXi, 1, 1});            // 辅助外加磁场，CT需1层虚网格
+    fld->register_field({"Badd_eta", StaggerLocation::FaceEt, 1, 1});           // 辅助外加磁场，CT需1层虚网格
+    fld->register_field({"Badd_zeta", StaggerLocation::FaceZe, 1, 1});          // 辅助外加磁场，CT需1层虚网格
+
+    // 辅助通量场
+    fld->register_field({"F_xi", StaggerLocation::FaceXi, 5, 0});        // 仅临存流体方程通量，无需虚网格
+    fld->register_field({"F_eta", StaggerLocation::FaceEt, 5, 0});       // 仅临存流体方程通量，无需虚网格
+    fld->register_field({"F_zeta", StaggerLocation::FaceZe, 5, 0});      // 仅临存流体方程通量，无需虚网格
+    fld->register_field({"E_face_xi", StaggerLocation::FaceXi, 3, 1});   // 由Riemann得到(Face)电场，为了CT法需要1层虚网格
+    fld->register_field({"E_face_eta", StaggerLocation::FaceEt, 3, 1});  // 由Riemann得到(Face)电场，为了CT法需要1层虚网格
+    fld->register_field({"E_face_zeta", StaggerLocation::FaceZe, 3, 1}); // 由Riemann得到(Face)电场，为了CT法需要1层虚网格
 
     // 辅助电场变量
-    fld->register_field({"E_xi", StaggerLocation::EdgeXi, 1, ngg});
-    fld->register_field({"E_eta", StaggerLocation::EdgeEt, 1, ngg});
-    fld->register_field({"E_zeta", StaggerLocation::EdgeZe, 1, ngg});
+    fld->register_field({"E_xi", StaggerLocation::EdgeXi, 1, 1});   // 用于CT方法，只需要1层虚网格
+    fld->register_field({"E_eta", StaggerLocation::EdgeEt, 1, 1});  // 用于CT方法，只需要1层虚网格
+    fld->register_field({"E_zeta", StaggerLocation::EdgeZe, 1, 1}); // 用于CT方法，只需要1层虚网格
+
 #if HALL_MODE != 0
     // 辅助Hall电场变量
-    fld->register_field({"Ehall_xi", StaggerLocation::EdgeXi, 1, ngg});
-    fld->register_field({"Ehall_eta", StaggerLocation::EdgeEt, 1, ngg});
-    fld->register_field({"Ehall_zeta", StaggerLocation::EdgeZe, 1, ngg});
-    fld->register_field({"J_xi", StaggerLocation::EdgeXi, 1, ngg});
-    fld->register_field({"J_eta", StaggerLocation::EdgeEt, 1, ngg});
-    fld->register_field({"J_zeta", StaggerLocation::EdgeZe, 1, ngg});
+    fld->register_field({"Ehall_xi", StaggerLocation::EdgeXi, 1, 1});   // 用于CT方法，只需要1层虚网格
+    fld->register_field({"Ehall_eta", StaggerLocation::EdgeEt, 1, 1});  // 用于CT方法，只需要1层虚网格
+    fld->register_field({"Ehall_zeta", StaggerLocation::EdgeZe, 1, 1}); // 用于CT方法，只需要1层虚网格
+    fld->register_field({"J_xi", StaggerLocation::EdgeXi, 1, 1});       // 用于CT方法，只需要1层虚网格
+    fld->register_field({"J_eta", StaggerLocation::EdgeEt, 1, 1});      // 用于CT方法，只需要1层虚网格
+    fld->register_field({"J_zeta", StaggerLocation::EdgeZe, 1, 1});     // 用于CT方法，只需要1层虚网格
 #endif
 
-    // 辅助磁场
-    fld->register_field({"B_cell", StaggerLocation::Cell, 3, ngg});
-    // 流体方程通量，辅助
-    fld->register_field(
-        FieldDescriptor{"F_xi", StaggerLocation::FaceXi, 5, par->GetInt("ngg")});
-    fld->register_field(
-        FieldDescriptor{"F_eta", StaggerLocation::FaceEt, 5, par->GetInt("ngg")});
-    fld->register_field(
-        FieldDescriptor{"F_zeta", StaggerLocation::FaceZe, 5, par->GetInt("ngg")});
-    // 原始变量
-    fld->register_field(
-        FieldDescriptor{"PV_", StaggerLocation::Cell, 4, par->GetInt("ngg")});
-    // 网格界面(Face)的电场向量，用于CT方法
-    fld->register_field(
-        FieldDescriptor{"E_face_xi", StaggerLocation::FaceXi, 3, par->GetInt("ngg")});
-    fld->register_field(
-        FieldDescriptor{"E_face_eta", StaggerLocation::FaceEt, 3, par->GetInt("ngg")});
-    fld->register_field(
-        FieldDescriptor{"E_face_zeta", StaggerLocation::FaceZe, 3, par->GetInt("ngg")});
+    // 计算辅助场
+    fld->register_field(FieldDescriptor{"old_U_", StaggerLocation::Cell, 5, 0});
+    fld->register_field(FieldDescriptor{"divB", StaggerLocation::Cell, 1, 0});
+    fld->register_field(FieldDescriptor{"old_B_xi", StaggerLocation::FaceXi, 1, 0});
+    fld->register_field(FieldDescriptor{"old_B_eta", StaggerLocation::FaceEt, 1, 0});
+    fld->register_field(FieldDescriptor{"old_B_zeta", StaggerLocation::FaceZe, 1, 0});
+    fld->register_field(FieldDescriptor{"RHS", StaggerLocation::Cell, 5, 0});
+    fld->register_field(FieldDescriptor{"RHS_xi", StaggerLocation::FaceXi, 1, 0});
+    fld->register_field(FieldDescriptor{"RHS_eta", StaggerLocation::FaceEt, 1, 0});
+    fld->register_field(FieldDescriptor{"RHS_zeta", StaggerLocation::FaceZe, 1, 0});
+#if HALL_MODE == 2
+    fld->register_field(FieldDescriptor{"RHShall_xi", StaggerLocation::FaceXi, 1, 0});
+    fld->register_field(FieldDescriptor{"RHShall_eta", StaggerLocation::FaceEt, 1, 0});
+    fld->register_field(FieldDescriptor{"RHShall_zeta", StaggerLocation::FaceZe, 1, 0});
+#endif
     //--------------------------------------------------------------------------
     // 建立Halo通信
     Halo *hal = new Halo(fld, &topology);
     //=============================================================================================
 
     //=============================================================================================
-    HallMHDSolver solver(grd, &topology, fld, hal, par, hall_imp, {"U_", "B_xi", "B_eta", "B_zeta"});
+    HallMHDSolver solver(grd, &topology, fld, hal, par, hall_imp); //, {"U_", "B_xi", "B_eta", "B_zeta"});
     solver.Advance();
     //=============================================================================================
 

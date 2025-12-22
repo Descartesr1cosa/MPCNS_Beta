@@ -1,3 +1,8 @@
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+
+// Z3_HallMHD
 #include "HallMHD_Solver.h"
 
 #if Reconstruction_Scheme == 1
@@ -103,10 +108,10 @@ void HallMHDSolver::Reconstruction(double *metric, int32_t direction,
         double Bz = B_cell(ic, jc, kc, 2); // including B_add
 
         double inner_product = Bx * metric[0] + By * metric[1] + Bz * metric[2];
-        double inner_product_add = B_add_x * metric[0] + B_add_y * metric[1] + B_add_z * metric[2];
+        // double inner_product_add = B_add_x * metric[0] + B_add_y * metric[1] + B_add_z * metric[2];
         double inver_norm2 = 1.0 / (metric[0] * metric[0] + metric[1] * metric[1] + metric[2] * metric[2] + 1E-20);
 
-        double B_jac_total = B_jac_nabla + inner_product_add; // 法向通量仅仅为induced部分
+        double B_jac_total = B_jac_nabla; // 法向通量仅仅为induced部分
         // 修正Bx By Bz保持法向分量的通量与感应CT值一致
         // double dBx, dBy, dBz;
         // dBx = (inner_product - B_jac_total) * inver_norm2 * metric[0];

@@ -1,4 +1,4 @@
-#include "Boundary.h"
+#include "1_boundary/Boundary.h"
 #include "array"
 
 void MHD_Boundary::apply_cell_copy(FieldBlock &U, PhysicalRegion &patch)

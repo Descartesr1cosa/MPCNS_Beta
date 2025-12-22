@@ -1,15 +1,111 @@
+#include <cmath>
+#include <cstdio>
+
+// Z3_HallMHD
 #include "HallMHD_Solver.h"
+#include "4_solver/ImplicitHall_Solver.h"
+//=========================================================================
+//-------------------------------------------------------------------------
+//=========================================================================
+void HallMHDSolver::Advance()
+{
+    // 0. Preparation
+    PrepareStep();
+
+    while (true)
+    {
+        if (StepOnce())
+            break;
+    }
+}
+//=========================================================================
+//-------------------------------------------------------------------------
+//=========================================================================
+bool HallMHDSolver::StepOnce()
+{
+    Compute_Timestep();
+    Time_Advance(); // 内部只编排：ZeroRHS/Assemble/Update
+
+#if HALL_MODE == 2
+    PrepareSubstep_NoSnapshot(); // 把 * 步状态同步到一致（但不要 SnapshotOldFields）
+    hall_->solve_implicit_hall(dt);
+    Modify_TotalEnergy_AfterHall();
+    Calc_Residual();
+    SnapshotOldFields();
+#else
+    Calc_Residual();
+    PrepareStep(); // 用于下一步/输出前字段一致
+#endif
+
+    return UpdateControlAndOutput();
+}
+
+void HallMHDSolver::Compute_Timestep()
+{
+    if (control_.Time_step > 0.0)
+    {
+        dt = control_.Time_step;
+    }
+    else
+    {
+        // CFL sanity check
+        if (!(control_.CFL > 0.0 && control_.CFL < 1.0))
+        {
+            std::fprintf(stderr,
+                         "[Timestep] CFL invalid for Explicit Euler: CFL=%g Time_step=%g\n",
+                         control_.CFL, control_.Time_step);
+            std::abort();
+        }
+
+        double radius_max = ComputeLocalMaxRadius_();
+
+        // 全局取 max 再算 dt
+        double radius_global = radius_max;
+        PARALLEL::mpi_max(&radius_max, &radius_global, 1);
+
+        if (radius_global <= 0.0 || std::isnan(radius_global))
+        {
+            std::fprintf(stderr, "[Timestep] radius_global <= 0 or is NAN, cannot compute dt.\n");
+            std::abort();
+        }
+
+        dt = control_.CFL / radius_global;
+    }
+
+    control_.Physic_Time_Step = dt;
+    fld_->par->AddParam("Physic_Time_Step", dt);
+}
+
+bool HallMHDSolver::UpdateControlAndOutput()
+{
+    // 更新控制
+    control_.Update();
+
+    if (control_.Nstep % control_.Resouput_step == 0)
+        PrintMinMaxDiagnostics_();
+
+    if (control_.if_outfile)
+        output_.output_field();
+
+    if (control_.if_stop)
+    {
+        // output_.output_plt_cell_field(output_.var_defaut_plt_name); //For debug
+        output_.output_field();
+        return true;
+    }
+    return false;
+}
 
 void HallMHDSolver::Calc_Residual()
 {
-    int ncomp = fld_->field("U_", 0).descriptor().ncomp;
+    int ncomp = fld_->field(fid_.fid_U, 0).descriptor().ncomp;
     double temp;
     for (int32_t i = 0; i < control_.residual.Getsize1(); i++)
         control_.residual(i) = 0.0;
     for (int iblock = 0; iblock < fld_->num_blocks(); iblock++)
     {
-        auto &U_calc = fld_->field("U_", iblock);
-        auto &field_U = fld_->field("old_U_", iblock);
+        auto &U_calc = fld_->field(fid_.fid_U, iblock);
+        auto &field_U = fld_->field(fid_.fid_old_U, iblock);
 
         const Int3 &sub = U_calc.inner_lo();
         const Int3 &sup = U_calc.inner_hi();
@@ -40,8 +136,8 @@ void HallMHDSolver::Calc_Residual()
 
     for (int iblock = 0; iblock < fld_->num_blocks(); iblock++)
     {
-        auto &U_calc = fld_->field("B_xi", iblock);
-        auto &field_U = fld_->field("old_B_xi", iblock);
+        auto &U_calc = fld_->field(fid_.fid_Bface.xi, iblock);
+        auto &field_U = fld_->field(fid_.fid_old_Bface.xi, iblock);
 
         const Int3 &sub = U_calc.inner_lo();
         const Int3 &sup = U_calc.inner_hi();
@@ -61,8 +157,8 @@ void HallMHDSolver::Calc_Residual()
     }
     for (int iblock = 0; iblock < fld_->num_blocks(); iblock++)
     {
-        auto &U_calc = fld_->field("B_eta", iblock);
-        auto &field_U = fld_->field("old_B_eta", iblock);
+        auto &U_calc = fld_->field(fid_.fid_Bface.eta, iblock);
+        auto &field_U = fld_->field(fid_.fid_old_Bface.eta, iblock);
 
         const Int3 &sub = U_calc.inner_lo();
         const Int3 &sup = U_calc.inner_hi();
@@ -82,8 +178,8 @@ void HallMHDSolver::Calc_Residual()
     }
     for (int iblock = 0; iblock < fld_->num_blocks(); iblock++)
     {
-        auto &U_calc = fld_->field("B_zeta", iblock);
-        auto &field_U = fld_->field("old_B_zeta", iblock);
+        auto &U_calc = fld_->field(fid_.fid_Bface.zeta, iblock);
+        auto &field_U = fld_->field(fid_.fid_old_Bface.zeta, iblock);
 
         const Int3 &sub = U_calc.inner_lo();
         const Int3 &sup = U_calc.inner_hi();

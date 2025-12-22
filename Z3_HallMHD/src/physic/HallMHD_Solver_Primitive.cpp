@@ -6,9 +6,9 @@ void HallMHDSolver::calc_PV()
 
     for (int ib = 0; ib < nblock; ++ib)
     {
-        auto &U = fld_->field(fid_U, ib);
-        auto &PV = fld_->field(fid_PV, ib);
-        auto &Bcell = fld_->field(fid_Bcell, ib);
+        auto &U = fld_->field(fid_.fid_U, ib);
+        auto &PV = fld_->field(fid_.fid_PV, ib);
+        auto &Bcell = fld_->field(fid_.fid_Bcell, ib);
 
         Int3 lo = U.get_lo();
         Int3 hi = U.get_hi();
@@ -107,17 +107,21 @@ void HallMHDSolver::calc_Bcell()
 
     for (int ib = 0; ib < nblock; ++ib)
     {
-        auto &Bcell = fld_->field(fid_Bcell, ib);
-        auto &U = fld_->field(fid_U, ib);
+        auto &Bcell = fld_->field(fid_.fid_Bcell, ib);
+        auto &U = fld_->field(fid_.fid_U, ib);
 
-        auto &Bxi = fld_->field(fid_Bxi, ib);
-        auto &Beta = fld_->field(fid_Beta, ib);
-        auto &Bzeta = fld_->field(fid_Bzeta, ib);
+        auto &Bxi = fld_->field(fid_.fid_Bface.xi, ib);
+        auto &Beta = fld_->field(fid_.fid_Bface.eta, ib);
+        auto &Bzeta = fld_->field(fid_.fid_Bface.zeta, ib);
 
-        auto &Jac = fld_->field(fid_Jac, ib);
-        auto &A_xi = fld_->field(fid_Xi, ib);   // JDxi
-        auto &A_eta = fld_->field(fid_Eta, ib); // JDet
-        auto &A_ze = fld_->field(fid_Zeta, ib); // JDze
+        auto &Baddxi = fld_->field(fid_.fid_Badd.xi, ib);
+        auto &Baddeta = fld_->field(fid_.fid_Badd.eta, ib);
+        auto &Baddzeta = fld_->field(fid_.fid_Badd.zeta, ib);
+
+        auto &Jac = fld_->field(fid_.fid_Jac, ib);
+        auto &A_xi = fld_->field(fid_.fid_metric.xi, ib);   // JDxi
+        auto &A_eta = fld_->field(fid_.fid_metric.eta, ib); // JDet
+        auto &A_ze = fld_->field(fid_.fid_metric.zeta, ib); // JDze
 
         auto &x = grd_->grids(ib).x;
         auto &y = grd_->grids(ib).y;
@@ -195,7 +199,7 @@ void HallMHDSolver::calc_Bcell()
                         -A_xi(i, j, k, 0),
                         -A_xi(i, j, k, 1),
                         -A_xi(i, j, k, 2)};
-                    double Phi_xm = -Bxi(i, j, k, 0);
+                    double Phi_xm = -Bxi(i, j, k, 0) - Baddxi(i, j, k, 0);
                     push(S_xm, Phi_xm, xfc_xi(i, j, k));
 
                     // ---------- xi+ face (at i+1) ----------
@@ -203,7 +207,7 @@ void HallMHDSolver::calc_Bcell()
                         A_xi(i + 1, j, k, 0),
                         A_xi(i + 1, j, k, 1),
                         A_xi(i + 1, j, k, 2)};
-                    double Phi_xp = Bxi(i + 1, j, k, 0);
+                    double Phi_xp = Bxi(i + 1, j, k, 0) + Baddxi(i + 1, j, k, 0);
                     push(S_xp, Phi_xp, xfc_xi(i + 1, j, k));
 
                     // ---------- eta- face (at j) ----------
@@ -211,7 +215,7 @@ void HallMHDSolver::calc_Bcell()
                         -A_eta(i, j, k, 0),
                         -A_eta(i, j, k, 1),
                         -A_eta(i, j, k, 2)};
-                    double Phi_em = -Beta(i, j, k, 0);
+                    double Phi_em = -Beta(i, j, k, 0) - Baddeta(i, j, k, 0);
                     push(S_em, Phi_em, xfc_eta(i, j, k));
 
                     // ---------- eta+ face (at j+1) ----------
@@ -219,7 +223,7 @@ void HallMHDSolver::calc_Bcell()
                         A_eta(i, j + 1, k, 0),
                         A_eta(i, j + 1, k, 1),
                         A_eta(i, j + 1, k, 2)};
-                    double Phi_ep = Beta(i, j + 1, k, 0);
+                    double Phi_ep = Beta(i, j + 1, k, 0) + Baddeta(i, j + 1, k, 0);
                     push(S_ep, Phi_ep, xfc_eta(i, j + 1, k));
 
                     // ---------- zeta- face (at k) ----------
@@ -227,7 +231,7 @@ void HallMHDSolver::calc_Bcell()
                         -A_ze(i, j, k, 0),
                         -A_ze(i, j, k, 1),
                         -A_ze(i, j, k, 2)};
-                    double Phi_zm = -Bzeta(i, j, k, 0);
+                    double Phi_zm = -Bzeta(i, j, k, 0) - Baddzeta(i, j, k, 0);
                     push(S_zm, Phi_zm, xfc_zeta(i, j, k));
 
                     // ---------- zeta+ face (at k+1) ----------
@@ -235,7 +239,7 @@ void HallMHDSolver::calc_Bcell()
                         A_ze(i, j, k + 1, 0),
                         A_ze(i, j, k + 1, 1),
                         A_ze(i, j, k + 1, 2)};
-                    double Phi_zp = Bzeta(i, j, k + 1, 0);
+                    double Phi_zp = Bzeta(i, j, k + 1, 0) + Baddzeta(i, j, k + 1, 0);
                     push(S_zp, Phi_zp, xfc_zeta(i, j, k + 1));
 
                     // ---------- build normal equations N = A^T W A, r = A^T W phi ----------
@@ -289,25 +293,17 @@ void HallMHDSolver::calc_Bcell()
 
                     double inv = 1.0 / det;
 
-                    double Bx_ind = inv * (C00 * rx + C01 * ry + C02 * rz);
-                    double By_ind = inv * (C01 * rx + C11 * ry + C12 * rz);
-                    double Bz_ind = inv * (C02 * rx + C12 * ry + C22 * rz);
+                    double Bx_tot = inv * (C00 * rx + C01 * ry + C02 * rz);
+                    double By_tot = inv * (C01 * rx + C11 * ry + C12 * rz);
+                    double Bz_tot = inv * (C02 * rx + C12 * ry + C22 * rz);
 
-                    // background field if you want it
-                    const double Bx_tot = Bx_ind + B_add_x;
-                    const double By_tot = By_ind + B_add_y;
-                    const double Bz_tot = Bz_ind + B_add_z;
-
-                    // energy consistency (keep your existing style)
-                    const double Bx_old = Bcell(i, j, k, 0);
-                    const double By_old = Bcell(i, j, k, 1);
-                    const double Bz_old = Bcell(i, j, k, 2);
-
-                    const double Delta_Eb =
-                        0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) -
-                        0.5 * inver_MA2 * (Bx_old * Bx_old + By_old * By_old + Bz_old * Bz_old);
-
-                    // U(i, j, k, 4) += Delta_Eb;
+                    // // energy consistency (keep your existing style)
+                    // const double Bx_old = Bcell(i, j, k, 0);
+                    // const double By_old = Bcell(i, j, k, 1);
+                    // const double Bz_old = Bcell(i, j, k, 2);
+                    // const double Delta_Eb =
+                    //     0.5 * inver_MA2 * (Bx_tot * Bx_tot + By_tot * By_tot + Bz_tot * Bz_tot) -
+                    //     0.5 * inver_MA2 * (Bx_old * Bx_old + By_old * By_old + Bz_old * Bz_old);
 
                     Bcell(i, j, k, 0) = Bx_tot;
                     Bcell(i, j, k, 1) = By_tot;
@@ -322,11 +318,11 @@ void HallMHDSolver::calc_divB()
 
     for (int ib = 0; ib < nblock; ++ib)
     {
-        auto &divB = fld_->field("divB", ib);
-        auto &Bxi = fld_->field("B_xi", ib);
-        auto &Beta = fld_->field("B_eta", ib);
-        auto &Bzeta = fld_->field("B_zeta", ib);
-        auto &Jac = fld_->field("Jac", ib);
+        auto &divB = fld_->field(fid_.fid_divB, ib);
+        auto &Bxi = fld_->field(fid_.fid_Bface.xi, ib);
+        auto &Beta = fld_->field(fid_.fid_Bface.eta, ib);
+        auto &Bzeta = fld_->field(fid_.fid_Bface.zeta, ib);
+        auto &Jac = fld_->field(fid_.fid_Jac, ib);
 
         Int3 lo = divB.inner_lo();
         Int3 hi = divB.inner_hi();
@@ -340,61 +336,5 @@ void HallMHDSolver::calc_divB()
                                         Bzeta(i, j, k + 1, 0) - Bzeta(i, j, k, 0)) /
                                        Jac(i, j, k, 0);
                 }
-    }
-}
-
-void HallMHDSolver::copy_field()
-{
-    for (int ib = 0; ib < fld_->num_blocks(); ib++)
-    {
-        {
-            auto &U = fld_->field("U_", ib);
-            auto &old_U = fld_->field("old_U_", ib);
-            int ncomp = U.descriptor().ncomp;
-            const Int3 &sub = U.get_lo();
-            const Int3 &sup = U.get_hi();
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                        for (int m = 0; m < ncomp; m++)
-                            old_U(i, j, k, m) = U(i, j, k, m);
-        }
-
-        {
-            auto &U = fld_->field("B_xi", ib);
-            auto &old_U = fld_->field("old_B_xi", ib);
-            int ncomp = U.descriptor().ncomp;
-            const Int3 &sub = U.get_lo();
-            const Int3 &sup = U.get_hi();
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                        for (int m = 0; m < ncomp; m++)
-                            old_U(i, j, k, m) = U(i, j, k, m);
-        }
-        {
-            auto &U = fld_->field("B_eta", ib);
-            auto &old_U = fld_->field("old_B_eta", ib);
-            int ncomp = U.descriptor().ncomp;
-            const Int3 &sub = U.get_lo();
-            const Int3 &sup = U.get_hi();
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                        for (int m = 0; m < ncomp; m++)
-                            old_U(i, j, k, m) = U(i, j, k, m);
-        }
-        {
-            auto &U = fld_->field("B_zeta", ib);
-            auto &old_U = fld_->field("old_B_zeta", ib);
-            int ncomp = U.descriptor().ncomp;
-            const Int3 &sub = U.get_lo();
-            const Int3 &sup = U.get_hi();
-            for (int i = sub.i; i < sup.i; i++)
-                for (int j = sub.j; j < sup.j; j++)
-                    for (int k = sub.k; k < sup.k; k++)
-                        for (int m = 0; m < ncomp; m++)
-                            old_U(i, j, k, m) = U(i, j, k, m);
-        }
     }
 }

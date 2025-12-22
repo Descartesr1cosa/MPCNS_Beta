@@ -10,7 +10,8 @@
 #include "2_topology/2_MPCNS_Topology.h"
 #include "3_field/2_MPCNS_Field.h"
 #include "3_field/3_MPCNS_Halo.h"
-#include "Boundary.h"
+
+#include "1_boundary/Boundary.h"
 
 class ImplicitHall_Solver
 {

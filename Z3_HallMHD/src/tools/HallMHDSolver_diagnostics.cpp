@@ -1,27 +1,8 @@
+
+#include "0_basic/MPI_WRAPPER.h"
+
 #include "HallMHD_Solver.h"
 
-bool HallMHDSolver::UpdateControlAndOutput()
-{
-    // 更新控制
-    control_.Update();
-
-    if (fmod(control_.Nstep, control_.Resouput_step) == 0)
-        PrintMinMaxDiagnostics_();
-
-    if (control_.if_outfile)
-        output_.output_field();
-    // output_.output_plt_cell_field(output_.var_defaut_plt_name); //For debug
-    // output_.output_plt_field(); // output_.output_plt_cell_field(output_.var_defaut_plt_name); // output_field();
-    if (control_.if_stop)
-    {
-        // output_.output_plt_cell_field(output_.var_defaut_plt_name); //For debug
-        output_.output_field();
-        return true;
-    }
-    return false;
-}
-
-// 统计 inner 域的 min/max，并做 MPI 全局归约
 void HallMHDSolver::PrintMinMaxDiagnostics_()
 {
     const int myid = par_->GetInt("myid");
@@ -46,10 +27,10 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     const int nblock = fld_->num_blocks();
     for (int ib = 0; ib < nblock; ++ib)
     {
-        auto &U = fld_->field(fid_U, ib);
-        auto &PV = fld_->field(fid_PV, ib);
-        auto &Bcel = fld_->field(fid_Bcell, ib);
-        auto &divB = fld_->field("divB", ib);
+        auto &U = fld_->field(fid_.fid_U, ib);
+        auto &PV = fld_->field(fid_.fid_PV, ib);
+        auto &Bcel = fld_->field(fid_.fid_Bcell, ib);
+        auto &divB = fld_->field(fid_.fid_divB, ib);
 
         const Int3 lo = U.inner_lo();
         const Int3 hi = U.inner_hi();
