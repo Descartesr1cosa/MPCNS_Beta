@@ -117,9 +117,13 @@ void HallMHDSolver::ComputeHallE_AtEdges_EnergyPreserving_()
     {
         auto &U = fld_->field(fid_.fid_U, iblk);
 
-        auto &Bxi = fld_->field(fid_.fid_Bface.xi, iblk);
-        auto &Beta = fld_->field(fid_.fid_Bface.eta, iblk);
-        auto &Bzeta = fld_->field(fid_.fid_Bface.zeta, iblk);
+        auto &Bind_xi = fld_->field(fid_.fid_Bface.xi, iblk);
+        auto &Bind_eta = fld_->field(fid_.fid_Bface.eta, iblk);
+        auto &Bind_zeta = fld_->field(fid_.fid_Bface.zeta, iblk);
+
+        auto &Badd_xi = fld_->field(fid_.fid_Badd.xi, iblk);
+        auto &Badd_eta = fld_->field(fid_.fid_Badd.eta, iblk);
+        auto &Badd_zeta = fld_->field(fid_.fid_Badd.zeta, iblk);
 
         auto &Jxi = fld_->field(fid_.fid_Jedge.xi, iblk);
         auto &Jeta = fld_->field(fid_.fid_Jedge.eta, iblk);
@@ -161,6 +165,19 @@ void HallMHDSolver::ComputeHallE_AtEdges_EnergyPreserving_()
             return s > 0.0;
         };
 
+        auto Bxi = [&](int i, int j, int k, int m) -> double
+        {
+            return Bind_xi(i, j, k, m) + Badd_xi(i, j, k, m);
+        };
+        auto Beta = [&](int i, int j, int k, int m) -> double
+        {
+            return Bind_eta(i, j, k, m) + Badd_eta(i, j, k, m);
+        };
+        auto Bzeta = [&](int i, int j, int k, int m) -> double
+        {
+            return Bind_zeta(i, j, k, m) + Badd_zeta(i, j, k, m);
+        };
+
         // ============================================================
         // 1) EdgeXi : Ehall_xi(i,j,k) = (alpha * (J x B)) · dr_xi
         // ============================================================
@@ -190,7 +207,7 @@ void HallMHDSolver::ComputeHallE_AtEdges_EnergyPreserving_()
                         for (int di : {0, 1})
                             for (int dj : {0, -1})
                                 for (int dk : {0, -1})
-                                    Phi_xi += Bxi(i + di, j + dj, k + dk, 0);
+                                    Phi_xi += (Bxi(i + di, j + dj, k + dk, 0));
                         Phi_xi *= 0.125;
 
                         double Phi_eta = 0.5 * (Beta(i, j, k, 0) + Beta(i, j, k - 1, 0));
