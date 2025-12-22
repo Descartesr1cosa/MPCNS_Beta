@@ -8,7 +8,7 @@
 #include "3_io/Output.h"
 #include "3_io/Initial.h"
 #include "4_solver/Control.h"
-#include "4_solver/HallConfig.h"
+#include "0_state/HallConfig.h"
 
 // ---- forward declarations (avoid heavy includes in header) ----
 class Grid;

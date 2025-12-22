@@ -10,6 +10,7 @@
 
 // Z3_HallMHD
 #include "0_state/StateTypes.h" // 已有 Triplet(FieldT*)；这里我们再定义一个 IdTriplet
+#include "0_state/HallConfig.h"
 
 struct SolverFields
 {
