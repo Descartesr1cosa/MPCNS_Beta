@@ -32,24 +32,24 @@ HallMHDSolver::HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *
       par_(par),
       hall_(hall_imp)
 {
+    // ---- Cache field ids (compiled mode) ----
+    fid_.Init(fld_, CompiledHallMode());
+
+    // ---- components ----
+    control_.SetUp(par_, 8);
+    output_.SetUp(par_, fld_);
+    bound_.SetUp(grd_, fld_, topo_, par_);
+
     // ---- Initialization ----
     initial_.Initialization(fld_);
     ComputeBcellInner();
     SyncDerivedBcell();
     add_Emag_to_Etotal();
 
-    // ---- Cache field ids (compiled mode) ----
-    fid_.Init(fld_, CompiledHallMode());
-
     // ---- constants ----
     gamma_ = par_->GetDou_List("constant").data["gamma"];
     inver_MA2 = par_->GetDou("inver_MA2");
     hall_coef = inver_MA2 * par_->GetDou("phi");
-
-    // ---- components ----
-    control_.SetUp(par_, 8);
-    output_.SetUp(par_, fld_);
-    bound_.SetUp(grd_, fld_, topo_, par_);
 
     // ---- hall initial ----
 #if HALL_MODE == 2
