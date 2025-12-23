@@ -31,6 +31,7 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
         auto &PV = fld_->field(fid_.fid_PV, ib);
         auto &Bcel = fld_->field(fid_.fid_Bcell, ib);
         auto &divB = fld_->field(fid_.fid_divB, ib);
+        auto &jac = fld_->field(fid_.fid_Jac, ib);
 
         const Int3 lo = U.inner_lo();
         const Int3 hi = U.inner_hi();
@@ -47,7 +48,7 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
                     const double bz = Bcel(i, j, k, 2);
                     const double bmag = std::sqrt(bx * bx + by * by + bz * bz);
 
-                    const double divb = divB(i, j, k, 0);
+                    const double divb = divB(i, j, k, 0) * jac(i, j, k, 0);
 
                     rho_min_l = std::min(rho_min_l, rho);
                     rho_max_l = std::max(rho_max_l, rho);
@@ -104,9 +105,9 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     if (myid == 0)
     {
         std::printf(
-            "\t\trho   =[%.6e, %.6e]\tp        =[%.6e, %.6e]\n"
-            "\t\tBmag  =[%.6e, %.6e]\tmax|divB|=[%26.6e]\n"
-            "\t\tBx    =[%.6e, %.6e]\tBy       =[%.6e, %.6e]\tBz  =[%.6e, %.6e]\n",
+            "\t\trho   =[%.6e, %.6e]\tp            =[%.6e, %.6e]\n"
+            "\t\tBmag  =[%.6e, %.6e]\tmax|divB_PHI|=[%26.6e]\n"
+            "\t\tBx    =[%.6e, %.6e]\tBy           =[%.6e, %.6e]\tBz  =[%.6e, %.6e]\n",
             rho_min_g, rho_max_g, p_min_g, p_max_g,
             bmag_min_g, bmag_max_g, divb_absmax_g,
             bx_min_g, bx_max_g, by_min_g, by_max_g, bz_min_g, bz_max_g);
