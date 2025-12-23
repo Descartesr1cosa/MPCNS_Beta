@@ -32,18 +32,20 @@ void ImplicitHall_Solver::alloc_owner_by_B_inner_and_fill1_()
     }
 }
 
-// 将物理边界的face都设置为0
+// 将Pole边界的face都设置为0
 void ImplicitHall_Solver::apply_physical_bc_mask_()
 {
-    // 第一版最稳策略：物理边界上的 B_face 都不作为未知量（=0），每次残差评估由 BC 覆盖它们
+    // 挑选出Pole边界，不作为DOF
     for (auto &p : topo_->physical_patches)
     {
+        if (p.bc_name != "Pole")
+            continue;
         const int axis = face_axis_from_node_box_(p.this_box_node);
         if (axis < 0)
             continue;
 
         // topo_里面的范围是基于node的，这里会自动处理为对应的范围
-        mark_face_patch_(p.this_block, p.this_box_node, axis, (PetscInt)1);
+        mark_face_patch_(p.this_block, p.this_box_node, axis, (PetscInt)0);
     }
 }
 
