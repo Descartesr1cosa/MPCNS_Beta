@@ -115,7 +115,17 @@ void ImplicitHall_Solver::solve_implicit_hall(double dt)
     VecCopy(X_, Xref_);
 
     // 运行 SNES
-    SNESSolve(snes_, nullptr, X_);
+    PetscErrorCode ierr = SNESSolve(snes_, nullptr, X_);
+
+    // 检查收敛情况，如果不收敛直接退出
+    SNESConvergedReason reason;
+    ierr = SNESGetConvergedReason(snes_, &reason);
+    if (reason < 0)
+    {
+        PetscPrintf(PETSC_COMM_WORLD,
+                    "[ImplicitHall] SNES diverged: reason=%d\n", (int)reason);
+        MPI_Abort(PETSC_COMM_WORLD, -10086);
+    }
 
     // 写回（也可不写回；这里写回方便你验证整套链）
     vec2B(X_);
