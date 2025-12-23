@@ -92,7 +92,7 @@ int main(int arg, char **argv)
 
     // 计算辅助场
     fld->register_field(FieldDescriptor{"old_U_", StaggerLocation::Cell, 5, 0});
-    fld->register_field(FieldDescriptor{"divB", StaggerLocation::Cell, 1, 0});
+    fld->register_field(FieldDescriptor{"divB", StaggerLocation::Cell, 1, 1}); // 输出存在插值到node的需要，增加一层虚网格
     fld->register_field(FieldDescriptor{"old_B_xi", StaggerLocation::FaceXi, 1, 0});
     fld->register_field(FieldDescriptor{"old_B_eta", StaggerLocation::FaceEt, 1, 0});
     fld->register_field(FieldDescriptor{"old_B_zeta", StaggerLocation::FaceZe, 1, 0});
