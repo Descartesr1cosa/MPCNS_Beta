@@ -133,6 +133,7 @@ private:
     //=========================================================================
 
     // ================================== TOOLS ==============================
+    void calc_physical_constant(Param *par);
     void calc_PV();
     void calc_Bcell();
     void calc_divB();

@@ -35,6 +35,9 @@ HallMHDSolver::HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *
     // ---- Cache field ids (compiled mode) ----
     fid_.Init(fld_, CompiledHallMode());
 
+    // ---- Calc Constants ----
+    calc_physical_constant(par);
+
     // ---- components ----
     control_.SetUp(par_, 8);
     output_.SetUp(par_, fld_);
@@ -45,11 +48,6 @@ HallMHDSolver::HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *
     ComputeBcellInner();
     SyncDerivedBcell();
     add_Emag_to_Etotal();
-
-    // ---- constants ----
-    gamma_ = par_->GetDou_List("constant").data["gamma"];
-    inver_MA2 = par_->GetDou("inver_MA2");
-    hall_coef = inver_MA2 * par_->GetDou("phi");
 
     // ---- hall initial ----
 #if HALL_MODE == 2
