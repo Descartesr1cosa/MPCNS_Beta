@@ -120,10 +120,14 @@ void ImplicitHall_Solver::solve_implicit_hall(double dt)
     // 检查收敛情况，如果不收敛直接退出
     SNESConvergedReason reason;
     ierr = SNESGetConvergedReason(snes_, &reason);
-    if (reason < 0)
+    PetscReal fnorm = 0.0;
+    SNESGetFunctionNorm(snes_, &fnorm);
+    const PetscReal my_fnorm_hard = 1e-9; // （可以和 dt/网格尺度挂钩）
+    if (reason < 0 || PetscIsInfOrNanReal(fnorm) || fnorm > my_fnorm_hard)
+    // if (reason != SNES_CONVERGED_FNORM_ABS && reason != SNES_CONVERGED_FNORM_RELATIVE)
     {
         PetscPrintf(PETSC_COMM_WORLD,
-                    "[ImplicitHall] SNES diverged: reason=%d\n", (int)reason);
+                    "[ImplicitHall] SNES not acceptable: reason=%d (%s), fnorm=%.6e\n", (int)reason, SNESConvergedReasons[reason], (double)fnorm);
         MPI_Abort(PETSC_COMM_WORLD, -10086);
     }
 
