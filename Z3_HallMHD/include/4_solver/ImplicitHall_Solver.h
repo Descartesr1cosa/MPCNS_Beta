@@ -144,6 +144,8 @@ private:
         alloc_owner_by_B_inner_and_fill1_();
         apply_physical_bc_mask_();
         apply_interface_nonowner_mask_();
+
+        apply_degenerate_geometry_mask_(); // <--- 新增：把退化面 owner=0
     }
     //-------------------------------------------------------------------------
     // 开辟owner空间，初始化为1
@@ -155,6 +157,7 @@ private:
     // 将inner parallel边界的face按照优先级(rank block i j k)取较小的保留为1，否则为被动量并设置为-1
     void apply_interface_nonowner_mask_();
 
+    void apply_degenerate_geometry_mask_(); // 把退化面 owner=0
     //-------------------------------------------------------------------------
     // tool find out which face the Box3 is
     int face_axis_from_node_box_(const Box3 &b);

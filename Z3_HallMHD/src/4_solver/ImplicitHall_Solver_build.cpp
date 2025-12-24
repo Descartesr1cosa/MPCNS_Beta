@@ -922,3 +922,180 @@ void ImplicitHall_Solver::build_local_dof_map_faces_owner_only_()
 }
 
 //=========================================================================
+
+void ImplicitHall_Solver::apply_degenerate_geometry_mask_()
+{
+    const int fid_JDxi = fld_->field_id("JDxi");
+    const int fid_JDet = fld_->field_id("JDet");
+    const int fid_JDze = fld_->field_id("JDze");
+
+    if (fid_JDxi < 0 || fid_JDet < 0 || fid_JDze < 0)
+    {
+        // Geometry cache not available; do nothing.
+        PetscPrintf(PETSC_COMM_WORLD,
+                    "[ImplicitHall] apply_degenerate_geometry_mask_: JD* fields not found; skip.\n");
+        return;
+    }
+
+    auto mag3 = [](double x, double y, double z) -> double
+    {
+        return std::sqrt(x * x + y * y + z * z);
+    };
+
+    // --- 1) compute local max area magnitude for each face family
+    double lmax_xi = 0.0, lmax_et = 0.0, lmax_ze = 0.0;
+
+    for (int ib = 0; ib < grd_->nblock; ++ib)
+    {
+        // Use the B-face inner range to match owner_* extents (and to avoid ghost-only regions)
+        FieldBlock &Bxi = fld_->field(fid_Bxi, ib);
+        FieldBlock &Beta = fld_->field(fid_Beta, ib);
+        FieldBlock &Bze = fld_->field(fid_Bzeta, ib);
+
+        FieldBlock &JDxi = fld_->field(fid_JDxi, ib);
+        FieldBlock &JDet = fld_->field(fid_JDet, ib);
+        FieldBlock &JDze = fld_->field(fid_JDze, ib);
+
+        // xi faces
+        {
+            Int3 lo = Bxi.inner_lo();
+            Int3 hi = Bxi.inner_hi();
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        const double a = mag3(JDxi(i, j, k, 0), JDxi(i, j, k, 1), JDxi(i, j, k, 2));
+                        lmax_xi = std::max(lmax_xi, a);
+                    }
+        }
+
+        // eta faces
+        {
+            Int3 lo = Beta.inner_lo();
+            Int3 hi = Beta.inner_hi();
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        const double a = mag3(JDet(i, j, k, 0), JDet(i, j, k, 1), JDet(i, j, k, 2));
+                        lmax_et = std::max(lmax_et, a);
+                    }
+        }
+
+        // zeta faces
+        {
+            Int3 lo = Bze.inner_lo();
+            Int3 hi = Bze.inner_hi();
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        const double a = mag3(JDze(i, j, k, 0), JDze(i, j, k, 1), JDze(i, j, k, 2));
+                        lmax_ze = std::max(lmax_ze, a);
+                    }
+        }
+    }
+
+    // --- 2) global max (across MPI ranks)
+    double gmax_xi = 0.0, gmax_et = 0.0, gmax_ze = 0.0;
+    MPI_Allreduce(&lmax_xi, &gmax_xi, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
+    MPI_Allreduce(&lmax_et, &gmax_et, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
+    MPI_Allreduce(&lmax_ze, &gmax_ze, 1, MPI_DOUBLE, MPI_MAX, PETSC_COMM_WORLD);
+
+    // Tolerances: keep very small but scale-aware.
+    // You can tighten/loosen eps_rel if you see over/under masking.
+    const double eps_rel = 1e-14;
+    const double eps_abs = 1e-300;
+
+    const double thr_xi = std::max(eps_abs, eps_rel * (gmax_xi + eps_abs));
+    const double thr_et = std::max(eps_abs, eps_rel * (gmax_et + eps_abs));
+    const double thr_ze = std::max(eps_abs, eps_rel * (gmax_ze + eps_abs));
+
+    // --- 3) apply mask: owner==1 and |A| < thr => owner=0
+    long long lcut_xi = 0, lcut_et = 0, lcut_ze = 0;
+
+    for (int ib = 0; ib < grd_->nblock; ++ib)
+    {
+        FieldBlock &Bxi = fld_->field(fid_Bxi, ib);
+        FieldBlock &Beta = fld_->field(fid_Beta, ib);
+        FieldBlock &Bze = fld_->field(fid_Bzeta, ib);
+
+        FieldBlock &JDxi = fld_->field(fid_JDxi, ib);
+        FieldBlock &JDet = fld_->field(fid_JDet, ib);
+        FieldBlock &JDze = fld_->field(fid_JDze, ib);
+
+        // owner masks
+        auto &own_xi = owner_bxi_[ib];
+        auto &own_et = owner_beta_[ib];
+        auto &own_ze = owner_bzeta_[ib];
+
+        // xi faces
+        {
+            Int3 lo = Bxi.inner_lo();
+            Int3 hi = Bxi.inner_hi();
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        if (own_xi(i, j, k) != 1)
+                            continue;
+                        const double a = mag3(JDxi(i, j, k, 0), JDxi(i, j, k, 1), JDxi(i, j, k, 2));
+                        if (a < thr_xi)
+                        {
+                            own_xi(i, j, k) = 0;
+                            ++lcut_xi;
+                        }
+                    }
+        }
+
+        // eta faces
+        {
+            Int3 lo = Beta.inner_lo();
+            Int3 hi = Beta.inner_hi();
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        if (own_et(i, j, k) != 1)
+                            continue;
+                        const double a = mag3(JDet(i, j, k, 0), JDet(i, j, k, 1), JDet(i, j, k, 2));
+                        if (a < thr_et)
+                        {
+                            own_et(i, j, k) = 0;
+                            ++lcut_et;
+                        }
+                    }
+        }
+
+        // zeta faces
+        {
+            Int3 lo = Bze.inner_lo();
+            Int3 hi = Bze.inner_hi();
+            for (int i = lo.i; i < hi.i; ++i)
+                for (int j = lo.j; j < hi.j; ++j)
+                    for (int k = lo.k; k < hi.k; ++k)
+                    {
+                        if (own_ze(i, j, k) != 1)
+                            continue;
+                        const double a = mag3(JDze(i, j, k, 0), JDze(i, j, k, 1), JDze(i, j, k, 2));
+                        if (a < thr_ze)
+                        {
+                            own_ze(i, j, k) = 0;
+                            ++lcut_ze;
+                        }
+                    }
+        }
+    }
+
+    long long gcut_xi = 0, gcut_et = 0, gcut_ze = 0;
+    MPI_Allreduce(&lcut_xi, &gcut_xi, 1, MPI_LONG_LONG, MPI_SUM, PETSC_COMM_WORLD);
+    MPI_Allreduce(&lcut_et, &gcut_et, 1, MPI_LONG_LONG, MPI_SUM, PETSC_COMM_WORLD);
+    MPI_Allreduce(&lcut_ze, &gcut_ze, 1, MPI_LONG_LONG, MPI_SUM, PETSC_COMM_WORLD);
+
+    PetscPrintf(PETSC_COMM_WORLD,
+                "[ImplicitHall] Degenerate-geometry mask: removed owner DOFs (B_xi,B_eta,B_zeta)=(%lld,%lld,%lld), "
+                "thr=(%.3e,%.3e,%.3e), gmax|A|=(%.3e,%.3e,%.3e)\n",
+                gcut_xi, gcut_et, gcut_ze,
+                thr_xi, thr_et, thr_ze,
+                gmax_xi, gmax_et, gmax_ze);
+}
