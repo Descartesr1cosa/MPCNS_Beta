@@ -11,6 +11,8 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     double rho_max_l = -std::numeric_limits<double>::infinity();
     double p_min_l = std::numeric_limits<double>::infinity();
     double p_max_l = -std::numeric_limits<double>::infinity();
+    double V_min_l = std::numeric_limits<double>::infinity();
+    double V_max_l = -std::numeric_limits<double>::infinity();
 
     double bx_min_l = std::numeric_limits<double>::infinity();
     double bx_max_l = -std::numeric_limits<double>::infinity();
@@ -42,6 +44,9 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
                 {
                     const double rho = U(i, j, k, 0);
                     const double p = PV(i, j, k, 3);
+                    const double u = PV(i, j, k, 0);
+                    const double v = PV(i, j, k, 1);
+                    const double w = PV(i, j, k, 2);
 
                     const double bx = Bcel(i, j, k, 0);
                     const double by = Bcel(i, j, k, 1);
@@ -54,6 +59,8 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
                     rho_max_l = std::max(rho_max_l, rho);
                     p_min_l = std::min(p_min_l, p);
                     p_max_l = std::max(p_max_l, p);
+                    V_min_l = std::min(V_min_l, sqrt(u * u + v * v + w * w));
+                    V_max_l = std::max(V_max_l, sqrt(u * u + v * v + w * w));
 
                     bx_min_l = std::min(bx_min_l, bx);
                     bx_max_l = std::max(bx_max_l, bx);
@@ -70,20 +77,20 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     }
 
     // --- MPI global reduction ---
-    double rho_min_g, rho_max_g, p_min_g, p_max_g;
+    double rho_min_g, rho_max_g, p_min_g, p_max_g, V_min_g, V_max_g;
     double bx_min_g, bx_max_g, by_min_g, by_max_g, bz_min_g, bz_max_g;
     double bmag_min_g, bmag_max_g;
     double divb_absmax_g;
 
     PARALLEL::mpi_barrier();
 
-    double mins_l[6] = {rho_min_l, p_min_l, bx_min_l, by_min_l, bz_min_l, bmag_min_l};
-    double mins_g[6];
-    double maxs_l[7] = {rho_max_l, p_max_l, bx_max_l, by_max_l, bz_max_l, bmag_max_l, divb_absmax_l};
-    double maxs_g[7];
+    double mins_l[7] = {rho_min_l, p_min_l, bx_min_l, by_min_l, bz_min_l, bmag_min_l, V_min_l};
+    double mins_g[7];
+    double maxs_l[8] = {rho_max_l, p_max_l, bx_max_l, by_max_l, bz_max_l, bmag_max_l, divb_absmax_l, V_max_l};
+    double maxs_g[8];
 
-    PARALLEL::mpi_min(mins_l, mins_g, 6);
-    PARALLEL::mpi_max(maxs_l, maxs_g, 7);
+    PARALLEL::mpi_min(mins_l, mins_g, 7);
+    PARALLEL::mpi_max(maxs_l, maxs_g, 8);
 
     // 解包
     rho_min_g = mins_g[0];
@@ -92,6 +99,7 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     by_min_g = mins_g[3];
     bz_min_g = mins_g[4];
     bmag_min_g = mins_g[5];
+    V_min_g = mins_g[6];
 
     rho_max_g = maxs_g[0];
     p_max_g = maxs_g[1];
@@ -100,15 +108,16 @@ void HallMHDSolver::PrintMinMaxDiagnostics_()
     bz_max_g = maxs_g[4];
     bmag_max_g = maxs_g[5];
     divb_absmax_g = maxs_g[6];
+    V_max_g = maxs_g[7];
 
     // --- print on rank 0 only ---
     if (myid == 0)
     {
         std::printf(
-            "\t\trho   =[%.6e, %.6e]\tp            =[%.6e, %.6e]\n"
+            "\t\trho   =[%.6e, %.6e]\tp            =[%.6e, %.6e]\tVel =[%.6e, %.6e]\n"
             "\t\tBmag  =[%.6e, %.6e]\tmax|divB_PHI|=[%26.6e]\n"
             "\t\tBx    =[%.6e, %.6e]\tBy           =[%.6e, %.6e]\tBz  =[%.6e, %.6e]\n",
-            rho_min_g, rho_max_g, p_min_g, p_max_g,
+            rho_min_g, rho_max_g, p_min_g, p_max_g, V_min_g, V_max_g,
             bmag_min_g, bmag_max_g, divb_absmax_g,
             bx_min_g, bx_max_g, by_min_g, by_max_g, bz_min_g, bz_max_g);
         std::cout << std::endl
