@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(MPCNS_HallMHD)
 set(CMAKE_CXX_STANDARD 20)
-
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile_commands.json" FORCE)
 
 # --- PETSc: prefer pkg-config (apt), fallback to PETSC_DIR/PETSC_ARCH (source build) ---
 set(USE_PETSC_PKGCONFIG OFF)
