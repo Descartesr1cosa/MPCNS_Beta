@@ -3,30 +3,78 @@ project(MPCNS_HallMHD)
 set(CMAKE_CXX_STANDARD 20)
 
 
+# --- PETSc: prefer pkg-config (apt), fallback to PETSC_DIR/PETSC_ARCH (source build) ---
+set(USE_PETSC_PKGCONFIG OFF)
+
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  # Try common pkg-config names
+  pkg_check_modules(PETSC QUIET IMPORTED_TARGET PETSc)
+  if(NOT PETSC_FOUND)
+    pkg_check_modules(PETSC QUIET IMPORTED_TARGET petsc)
+  endif()
+
+  if(PETSC_FOUND)
+    set(USE_PETSC_PKGCONFIG ON)
+    message(STATUS "PETSc found via pkg-config: ${PETSC_VERSION}")
+  endif()
+endif()
+
+if(NOT USE_PETSC_PKGCONFIG)
+  # Fallback: environment variables for source-built PETSc
+  if(NOT DEFINED ENV{PETSC_DIR})
+    message(FATAL_ERROR
+      "PETSc not found via pkg-config, and PETSC_DIR is not set.\n"
+      "Either install PETSc dev package (e.g. petsc-dev) or set:\n"
+      "  export PETSC_DIR=/path/to/petsc\n"
+      "  export PETSC_ARCH=your-arch (if applicable)\n")
+  endif()
+
+  set(PETSC_DIR $ENV{PETSC_DIR})
+
+  # PETSC_ARCH may be empty for some installs; handle both cases
+  if(DEFINED ENV{PETSC_ARCH} AND NOT "$ENV{PETSC_ARCH}" STREQUAL "")
+    set(PETSC_ARCH $ENV{PETSC_ARCH})
+    message(STATUS "Using PETSc from PETSC_DIR=${PETSC_DIR}, PETSC_ARCH=${PETSC_ARCH}")
+
+    include_directories("${PETSC_DIR}/include" "${PETSC_DIR}/${PETSC_ARCH}/include")
+    link_directories("${PETSC_DIR}/${PETSC_ARCH}/lib")
+  else()
+    message(STATUS "Using PETSc from PETSC_DIR=${PETSC_DIR} (PETSC_ARCH not set)")
+
+    include_directories("${PETSC_DIR}/include")
+    link_directories("${PETSC_DIR}/lib")
+  endif()
+endif()
+
+
+
 # 从环境变量里读 PETSC_DIR / PETSC_ARCH
-if(NOT DEFINED ENV{PETSC_DIR})
-    message(FATAL_ERROR "环境变量 PETSC_DIR 没设，例如 export PETSC_DIR=/home/Descartes/tmp_petsc/petsc")
-endif()
-
-if(NOT DEFINED ENV{PETSC_ARCH})
-    message(FATAL_ERROR "环境变量 PETSC_ARCH 没设，例如 export PETSC_ARCH=arch-mswin-c-debug 或 arch-mswin-c-opt")
-endif()
-
-set(PETSC_DIR  $ENV{PETSC_DIR})
-set(PETSC_ARCH $ENV{PETSC_ARCH})
-
-message(STATUS "Using PETSc from: ${PETSC_DIR}")
-message(STATUS "Using PETSc arch: ${PETSC_ARCH}")
-
+# if(NOT DEFINED ENV{PETSC_DIR})
+#     message(FATAL_ERROR "环境变量 PETSC_DIR 没设，例如 export PETSC_DIR=/home/Descartes/tmp_petsc/petsc")
+# endif()
+# if(NOT DEFINED ENV{PETSC_ARCH})
+#     message(FATAL_ERROR "环境变量 PETSC_ARCH 没设，例如 export PETSC_ARCH=arch-mswin-c-debug 或 arch-mswin-c-opt")
+# endif()
+# set(PETSC_DIR  $ENV{PETSC_DIR})
+# set(PETSC_ARCH $ENV{PETSC_ARCH})
+# message(STATUS "Using PETSc from: ${PETSC_DIR}")
+# message(STATUS "Using PETSc arch: ${PETSC_ARCH}")
 # PETSc 头文件
-include_directories(
-    "${PETSC_DIR}/include"
-    "${PETSC_DIR}/${PETSC_ARCH}/include"
-)
-
+# include_directories(
+#     "${PETSC_DIR}/include"
+#     "${PETSC_DIR}/${PETSC_ARCH}/include"
+# )
 # PETSc 库目录
-link_directories("${PETSC_DIR}/${PETSC_ARCH}/lib")
+# link_directories("${PETSC_DIR}/${PETSC_ARCH}/lib")
 
+# 自己找PETSc
+# find_package(PkgConfig REQUIRED)
+# # 兼容 PETSc / petsc 两种 pkg-config 名称
+# pkg_check_modules(PETSC QUIET IMPORTED_TARGET PETSc)
+# if(NOT PETSC_FOUND)
+#   pkg_check_modules(PETSC REQUIRED IMPORTED_TARGET petsc)
+# endif()
 
 # Find MPI
 find_package(MPI REQUIRED)
@@ -65,6 +113,8 @@ add_executable(MPCNS_HallMHD main.cpp ${DIRSRCS0} ${DIRSRCS1} ${DIRSRCS2} ${DIRS
 #target_compile_options(MPCNS_HallMHD PRIVATE -std=c++20 -fconcepts)
 
 # add the mpi linkings
-target_link_libraries(MPCNS_HallMHD PRIVATE
-    petsc     openblas
-${MPI_LIBRARIES} stdc++fs)
+if(USE_PETSC_PKGCONFIG)
+  target_link_libraries(MPCNS_HallMHD PRIVATE PkgConfig::PETSC ${MPI_LIBRARIES} stdc++fs)
+else()
+  target_link_libraries(MPCNS_HallMHD PRIVATE petsc openblas ${MPI_LIBRARIES} stdc++fs)
+endif()
