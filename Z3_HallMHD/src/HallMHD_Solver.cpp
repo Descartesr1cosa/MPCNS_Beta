@@ -39,7 +39,6 @@ HallMHDSolver::HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *
     calc_physical_constant(par);
 
     // ---- components ----
-    control_.SetUp(par_, 8);
     output_.SetUp(par_, fld_);
     bound_.SetUp(grd_, fld_, topo_, par_);
 
@@ -48,6 +47,9 @@ HallMHDSolver::HallMHDSolver(Grid *grd, TOPO::Topology *topo, Field *fld, Halo *
     ComputeBcellInner();
     SyncDerivedBcell();
     add_Emag_to_Etotal();
+
+    // ---- components ----
+    control_.SetUp(par_, 8);
 
     // ---- hall initial ----
 #if HALL_MODE == 2
